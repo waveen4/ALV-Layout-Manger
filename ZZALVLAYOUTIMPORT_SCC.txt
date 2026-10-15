@@ -1,0 +1,75 @@
+*&---------------------------------------------------------------------*
+*& Include          ZALVLAYOUTIMPORT_SCC
+*&---------------------------------------------------------------------*
+
+DATA:
+  gs_sel_layout TYPE zcl_alvlayoutmgr=>ty_layout.
+
+*---------------------------------------------------------------------*
+* Source System Selection
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN:
+  BEGIN OF BLOCK b1
+  WITH FRAME TITLE text-001.
+
+PARAMETERS:
+  p_srfc TYPE rfcdest
+          OBLIGATORY
+          MATCHCODE OBJECT al_r3_rfcdest.
+
+PARAMETERS:
+  p_trfc TYPE rfcdest
+          OBLIGATORY
+          MATCHCODE OBJECT al_r3_rfcdest.
+SELECT-OPTIONS:
+  s_report FOR gs_sel_layout-report.
+
+SELECT-OPTIONS:
+  s_var FOR gs_sel_layout-variant.
+
+PARAMETERS:
+  p_user TYPE syuname.
+
+SELECTION-SCREEN:
+  END OF BLOCK b1.
+
+*---------------------------------------------------------------------*
+* Import Options
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN:
+  BEGIN OF BLOCK b2
+  WITH FRAME TITLE text-002.
+
+PARAMETERS:
+  p_tuser TYPE syuname.
+
+PARAMETERS:
+  p_glob AS CHECKBOX.
+
+PARAMETERS:
+  p_test AS CHECKBOX DEFAULT 'X'.
+
+PARAMETERS:
+  p_ovrw AS CHECKBOX.
+
+SELECTION-SCREEN:
+  END OF BLOCK b2.
+
+*---------------------------------------------------------------------*
+* Output Control
+*---------------------------------------------------------------------*
+
+SELECTION-SCREEN:
+  BEGIN OF BLOCK b9
+  WITH FRAME TITLE text-009.
+
+PARAMETERS:
+  p_ialv AS CHECKBOX DEFAULT 'X'.
+
+PARAMETERS:
+  p_start TYPE numc1 DEFAULT '1'.
+
+SELECTION-SCREEN:
+  END OF BLOCK b9.
