@@ -123,7 +123,7 @@ FORM get_layout_data.
       ir_var    = lt_variant
       iv_user   = p_user
     IMPORTING
-      et_layouts = gt_alv1
+      et_layouts = gt_alv1_all
       ev_success = lv_success
       ev_message = lv_message ).
 
@@ -141,7 +141,7 @@ FORM get_layout_data.
       ir_var    = lt_variant
       iv_user   = p_user
     IMPORTING
-      et_layouts = gt_alv2
+      et_layouts = gt_alv2_all
       ev_success = lv_success
       ev_message = lv_message ).
 
@@ -156,10 +156,10 @@ FORM get_layout_data.
     EXPORTING
       iv_source_rfcdst = p_srfc
       iv_target_rfcdst = p_trfc
-      it_source        = gt_alv1
-      it_target        = gt_alv2
+      it_source        = gt_alv1_all
+      it_target        = gt_alv2_all
     IMPORTING
-      et_comparison    = gt_alv3
+      et_comparison    = gt_alv3_all
       ev_success       = lv_success
       ev_message       = lv_message ).
 
@@ -169,6 +169,11 @@ FORM get_layout_data.
   IF lv_success = abap_false.
     MESSAGE lv_message TYPE 'E'.
   ENDIF.
+
+  CLEAR gs_context.
+  gt_alv1 = gt_alv1_all.
+  gt_alv2 = gt_alv2_all.
+  gt_alv3 = gt_alv3_all.
 
 ENDFORM.
 
@@ -489,7 +494,7 @@ FORM alv_tree_data.
     MESSAGE 'Could not assign selector tree row' TYPE 'E'.
   ENDIF.
 
-  LOOP AT gt_alv1 INTO ls_layout.
+  LOOP AT gt_alv1_all INTO ls_layout.
     CLEAR <gs_alvtree1>.
     MOVE-CORRESPONDING ls_layout TO <gs_alvtree1>.
     APPEND <gs_alvtree1> TO <gt_alvtree1>.
@@ -675,25 +680,46 @@ FORM user_command
     WHEN gc_import.
       IF gv_current_page = gc_page_alv1.
         PERFORM import_selected_layouts.
-        PERFORM refresh_catalogs.
+        " Keep ALV1 operation status and reload target/comparison only
+        PERFORM reload_target_and_comparison.
+        gv_refresh_alv1 = abap_true.
+        gv_refresh_alv2 = abap_true.
+        gv_refresh_alv3 = abap_true.
+
       ENDIF.
 
     WHEN gc_export.
       IF gv_current_page = gc_page_alv2.
         PERFORM export_selected_layouts.
-        PERFORM refresh_catalogs.
+        " Keep ALV2 operation status and reload source/comparison only
+        PERFORM reload_source_and_comparison.
+        gv_refresh_alv1 = abap_true.
+        gv_refresh_alv2 = abap_true.
+        gv_refresh_alv3 = abap_true.
       ENDIF.
 
     WHEN gc_delete.
       CASE gv_current_page.
         WHEN gc_page_alv1.
           PERFORM delete_selected_layouts.
+          PERFORM reload_target_and_comparison.
+          " Preserve DELETED/ERROR results in ALV1
+          gv_refresh_alv1 = abap_true.
+          gv_refresh_alv2 = abap_true.
+          gv_refresh_alv3 = abap_true.
+
         WHEN gc_page_alv2.
           PERFORM delete_selected_target_layouts.
+          PERFORM reload_source_and_comparison.
+          " Preserve DELETED/ERROR results in ALV2
+          gv_refresh_alv1 = abap_true.
+          gv_refresh_alv2 = abap_true.
+          gv_refresh_alv3 = abap_true.
+
       ENDCASE.
-      PERFORM refresh_catalogs.
 
     WHEN gc_refresh.
+      " Explicit refresh discards previous operation statuses
       PERFORM refresh_catalogs.
 
     WHEN gc_next.
@@ -993,6 +1019,14 @@ FORM delete_selected_layouts.
       INDEX ls_selected-index.
     CHECK sy-subrc = 0.
 
+*---------------------------------------------------------------------*
+* Prevent repeated deletion attempts
+*---------------------------------------------------------------------*
+    IF <ls_layout>-status =
+         zcl_alvlayoutmgr=>gc_status_deleted.
+      CONTINUE.
+    ENDIF.
+
     CLEAR: ls_result, lv_success, lv_message.
 
     go_layout_mgr->delete_layout(
@@ -1066,7 +1100,7 @@ FORM delete_selected_target_layouts.
     EXPORTING
       titlebar              = 'Delete Target Layouts'
       text_question         =
-        'Delete selected layouts in the target RFC system?'
+                              'Delete selected layouts in the target RFC system?'
       text_button_1         = 'Delete'
       text_button_2         = 'Cancel'
       default_button        = '2'
@@ -1094,6 +1128,14 @@ FORM delete_selected_target_layouts.
       INDEX ls_selected-index.
 
     CHECK sy-subrc = 0.
+
+*---------------------------------------------------------------------*
+* Prevent repeated deletion attempts
+*---------------------------------------------------------------------*
+    IF <ls_alv2>-status =
+         zcl_alvlayoutmgr=>gc_status_deleted.
+      CONTINUE.
+    ENDIF.
 
     CLEAR:
       ls_layout,
@@ -1173,55 +1215,34 @@ ENDFORM.
 
 
 FORM reload_target_and_comparison.
-
-  DATA:
-    lt_report  TYPE zcl_alvlayoutmgr=>ty_report_range,
-    lt_variant TYPE zcl_alvlayoutmgr=>ty_variant_range,
-    lv_success TYPE abap_bool,
-    lv_message TYPE bapi_msg.
-
-  lt_report[]  = s_report[].
-  lt_variant[] = s_var[].
-
-  go_layout_mgr->get_target_layouts(
-    EXPORTING
-      iv_rfcdst = p_trfc
-      ir_report = lt_report
-      ir_var    = lt_variant
-      iv_user   = p_user
-    IMPORTING
-      et_layouts = gt_alv2
-      ev_success = lv_success
-      ev_message = lv_message ).
-
-  IF lv_success = abap_false.
-    MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'.
-    RETURN.
-  ENDIF.
-
+  DATA: lt_report TYPE zcl_alvlayoutmgr=>ty_report_range, lt_variant TYPE zcl_alvlayoutmgr=>ty_variant_range, lv_success TYPE abap_bool, lv_message TYPE bapi_msg.
+  lt_report[] = s_report[]. lt_variant[] = s_var[].
+  go_layout_mgr->get_target_layouts( EXPORTING iv_rfcdst = p_trfc ir_report = lt_report ir_var = lt_variant iv_user = p_user IMPORTING et_layouts = gt_alv2_all ev_success = lv_success ev_message = lv_message ).
+  IF lv_success = abap_false. MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'. RETURN. ENDIF.
   CLEAR: lv_success, lv_message.
+  go_layout_mgr->compare_layouts( EXPORTING iv_source_rfcdst = p_srfc iv_target_rfcdst = p_trfc it_source = gt_alv1_all it_target = gt_alv2_all IMPORTING et_comparison = gt_alv3_all ev_success = lv_success ev_message = lv_message ).
+  IF lv_success = abap_false. MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'. RETURN. ENDIF.
+  gt_alv2 = go_layout_mgr->filter_target_layouts( it_target = gt_alv2_all is_context = gs_context ).
+  gt_alv3 = go_layout_mgr->filter_comparison( it_comparison = gt_alv3_all is_context = gs_context ).
+  PERFORM renumber_filtered_catalogues.
+  gv_refresh_data = abap_true. gv_refresh_alv2 = abap_true. gv_refresh_alv3 = abap_true.
+ENDFORM.
 
-  go_layout_mgr->compare_layouts(
-    EXPORTING
-      iv_source_rfcdst = p_srfc
-      iv_target_rfcdst = p_trfc
-      it_source        = gt_alv1
-      it_target        = gt_alv2
-    IMPORTING
-      et_comparison    = gt_alv3
-      ev_success       = lv_success
-      ev_message       = lv_message ).
-
-  IF lv_success = abap_false.
-    MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'.
-    RETURN.
-  ENDIF.
-
-  gv_refresh_data = abap_true.
-  gv_refresh_alv1 = abap_true.
-  gv_refresh_alv2 = abap_true.
-  gv_refresh_alv3 = abap_true.
-
+*---------------------------------------------------------------------*
+* Reload source layouts and rebuild comparison after export
+*---------------------------------------------------------------------*
+FORM reload_source_and_comparison.
+  DATA: lt_report TYPE zcl_alvlayoutmgr=>ty_report_range, lt_variant TYPE zcl_alvlayoutmgr=>ty_variant_range, lv_success TYPE abap_bool, lv_message TYPE bapi_msg.
+  lt_report[] = s_report[]. lt_variant[] = s_var[].
+  go_layout_mgr->get_source_layouts( EXPORTING iv_rfcdst = p_srfc ir_report = lt_report ir_var = lt_variant iv_user = p_user IMPORTING et_layouts = gt_alv1_all ev_success = lv_success ev_message = lv_message ).
+  IF lv_success = abap_false. MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'. RETURN. ENDIF.
+  CLEAR: lv_success, lv_message.
+  go_layout_mgr->compare_layouts( EXPORTING iv_source_rfcdst = p_srfc iv_target_rfcdst = p_trfc it_source = gt_alv1_all it_target = gt_alv2_all IMPORTING et_comparison = gt_alv3_all ev_success = lv_success ev_message = lv_message ).
+  IF lv_success = abap_false. MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'. RETURN. ENDIF.
+  gt_alv1 = go_layout_mgr->filter_source_layouts( it_source = gt_alv1_all is_context = gs_context ).
+  gt_alv3 = go_layout_mgr->filter_comparison( it_comparison = gt_alv3_all is_context = gs_context ).
+  PERFORM renumber_filtered_catalogues.
+  gv_refresh_data = abap_true. gv_refresh_alv1 = abap_true. gv_refresh_alv3 = abap_true.
 ENDFORM.
 
 
@@ -1367,6 +1388,33 @@ FORM refresh_alv_report
 
 ENDFORM.
 
+
+FORM set_tree_context USING iv_index TYPE i iv_grouplevel TYPE i.
+  FIELD-SYMBOLS: <ls_tree> TYPE any, <lv_value> TYPE any.
+  CLEAR gs_context.
+  IF <gt_alvtree1> IS NOT ASSIGNED OR iv_index IS INITIAL. RETURN. ENDIF.
+  READ TABLE <gt_alvtree1> ASSIGNING <ls_tree> INDEX iv_index. IF sy-subrc <> 0. RETURN. ENDIF.
+  IF iv_grouplevel >= 1. ASSIGN COMPONENT 'SOURCE' OF STRUCTURE <ls_tree> TO <lv_value>. IF sy-subrc = 0. gs_context-source = <lv_value>. ENDIF. ENDIF.
+  IF iv_grouplevel >= 2. ASSIGN COMPONENT 'REPORT' OF STRUCTURE <ls_tree> TO <lv_value>. IF sy-subrc = 0. gs_context-report = <lv_value>. ENDIF. ENDIF.
+  IF iv_grouplevel >= 3. ASSIGN COMPONENT 'USERNAME' OF STRUCTURE <ls_tree> TO <lv_value>. IF sy-subrc = 0. gs_context-username = <lv_value>. ENDIF. ENDIF.
+  IF iv_grouplevel >= 4. ASSIGN COMPONENT 'VARIANT' OF STRUCTURE <ls_tree> TO <lv_value>. IF sy-subrc = 0. gs_context-variant = <lv_value>. ENDIF. ENDIF.
+ENDFORM.
+
+FORM apply_tree_filter.
+  gt_alv1 = go_layout_mgr->filter_source_layouts( it_source = gt_alv1_all is_context = gs_context ).
+  gt_alv2 = go_layout_mgr->filter_target_layouts( it_target = gt_alv2_all is_context = gs_context ).
+  gt_alv3 = go_layout_mgr->filter_comparison( it_comparison = gt_alv3_all is_context = gs_context ).
+  PERFORM renumber_filtered_catalogues.
+  gv_refresh_alv1 = abap_true. gv_refresh_alv2 = abap_true. gv_refresh_alv3 = abap_true. gv_refresh_grid = abap_true.
+ENDFORM.
+
+FORM renumber_filtered_catalogues.
+  FIELD-SYMBOLS: <ls_alv1> TYPE zcl_alvlayoutmgr=>ty_alv1data, <ls_alv2> TYPE zcl_alvlayoutmgr=>ty_alv2data, <ls_alv3> TYPE zcl_alvlayoutmgr=>ty_alv3data.
+  DATA lv_counter TYPE i.
+  LOOP AT gt_alv1 ASSIGNING <ls_alv1>. ADD 1 TO lv_counter. <ls_alv1>-counter = lv_counter. ENDLOOP.
+  CLEAR lv_counter. LOOP AT gt_alv2 ASSIGNING <ls_alv2>. ADD 1 TO lv_counter. <ls_alv2>-counter = lv_counter. ENDLOOP.
+  CLEAR lv_counter. LOOP AT gt_alv3 ASSIGNING <ls_alv3>. ADD 1 TO lv_counter. <ls_alv3>-counter = lv_counter. ENDLOOP.
+ENDFORM.
 
 *---------------------------------------------------------------------*
 * Open the cockpit screen

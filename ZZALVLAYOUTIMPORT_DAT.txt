@@ -67,6 +67,14 @@ DATA:
   gs_alv3 TYPE zcl_alvlayoutmgr=>ty_alv3data.
 
 *---------------------------------------------------------------------*
+* Unfiltered master catalogues used by selector-tree filtering
+*---------------------------------------------------------------------*
+DATA:
+  gt_alv1_all TYPE zcl_alvlayoutmgr=>tt_alv1data,
+  gt_alv2_all TYPE zcl_alvlayoutmgr=>tt_alv2data,
+  gt_alv3_all TYPE zcl_alvlayoutmgr=>tt_alv3data.
+
+*---------------------------------------------------------------------*
 * Compatibility data
 *---------------------------------------------------------------------*
 * Keep these declarations temporarily while F01, CLI and O01 are moved
