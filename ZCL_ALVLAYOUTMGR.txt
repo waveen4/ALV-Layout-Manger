@@ -127,6 +127,16 @@ public section.
       !ET_LAYOUTS type TT_LAYOUT
       !EV_SUCCESS type ABAP_BOOL
       !EV_MESSAGE type BAPI_MSG .
+  methods GET_TARGET_LAYOUTS
+    importing
+      !IV_RFCDST type RFCDEST optional
+      !IR_REPORT type TY_REPORT_RANGE
+      !IR_VAR type TY_VARIANT_RANGE optional
+      !IV_USER type SYUNAME optional
+    exporting
+      !ET_LAYOUTS type TT_ALV2DATA
+      !EV_SUCCESS type ABAP_BOOL
+      !EV_MESSAGE type BAPI_MSG .
   methods READ_LAYOUT_DETAIL
     importing
       !IV_RFCDST type RFCDEST
@@ -190,16 +200,6 @@ public section.
       !IV_GLOBAL type ABAP_BOOL default ABAP_FALSE
     returning
       value(RS_KEY) type TY_LAYOUT_KEY .
-  methods GET_TARGET_LAYOUTS
-    importing
-      !IV_RFCDST type RFCDEST optional
-      !IR_REPORT type TY_REPORT_RANGE
-      !IR_VAR type TY_VARIANT_RANGE optional
-      !IV_USER type SYUNAME optional
-    exporting
-      !ET_LAYOUTS type TT_ALV2DATA
-      !EV_SUCCESS type ABAP_BOOL
-      !EV_MESSAGE type BAPI_MSG .
   methods COMPARE_LAYOUTS
     importing
       !IV_SOURCE_RFCDST type RFCDEST
@@ -656,37 +656,30 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
 * +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD delete_layout.
 
-  DATA:
-    ls_key         TYPE ty_layout_key,
-    ls_varkey      TYPE ltdxkey,
-    lv_rfc_message TYPE char255.
+    DATA:
+      ls_key         TYPE ty_layout_key,
+      ls_varkey      TYPE ltdxkey,
+      lv_rfc_message TYPE char255.
 
-  CLEAR:
-    es_layout,
-    ev_success,
-    ev_message,
-    ls_key,
-    ls_varkey,
-    lv_rfc_message.
+    CLEAR: es_layout, ev_success, ev_message,
+           ls_key, ls_varkey, lv_rfc_message.
 
-  es_layout = is_layout.
+    es_layout = is_layout.
 
-*---------------------------------------------------------------------*
-* Remote deletion in source system
-*---------------------------------------------------------------------*
-  IF iv_rfcdst IS NOT INITIAL.
+    IF iv_rfcdst IS INITIAL.
+      ev_message = 'RFC destination is required for deletion'.
+      es_layout-status  = gc_status_error.
+      es_layout-message = ev_message.
+      RETURN.
+    ENDIF.
 
-    ls_key = me->build_source_key(
-      is_layout = is_layout ).
-
-    ls_varkey = me->convert_to_ltdxkey(
-      is_key = ls_key ).
+    ls_key = me->build_source_key( is_layout = is_layout ).
+    ls_varkey = me->convert_to_ltdxkey( is_key = ls_key ).
 
     CALL FUNCTION 'ZZ_LAYOUT_DELETE_RFC'
       DESTINATION iv_rfcdst
       EXPORTING
         is_varkey = ls_varkey
-*       iv_test   = iv_test
       IMPORTING
         ev_success = ev_success
         ev_message = ev_message
@@ -694,120 +687,55 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
         invalid_key           = 1
         not_found             = 2
         delete_failed         = 3
-        system_failure        = 4
-          MESSAGE lv_rfc_message
-        communication_failure = 5
-          MESSAGE lv_rfc_message
-        OTHERS                = 6.
+        not_authorised        = 4
+        system_failure        = 5 MESSAGE lv_rfc_message
+        communication_failure = 6 MESSAGE lv_rfc_message
+        OTHERS                = 7.
 
     CASE sy-subrc.
-
       WHEN 0.
-
         IF ev_success = abap_true.
-
-*          IF iv_test = abap_true.
-*            es_layout-status = gc_status_ready.
-*          ELSE.
-            es_layout-status = gc_status_deleted.
-*          ENDIF.
-
+          es_layout-status = gc_status_deleted.
+          IF ev_message IS INITIAL.
+            ev_message = 'Layout deleted successfully'.
+          ENDIF.
         ELSE.
-
           es_layout-status = gc_status_error.
-
+          IF ev_message IS INITIAL.
+            ev_message = 'Remote system did not delete the layout'.
+          ENDIF.
         ENDIF.
-
       WHEN 1.
-
         ev_success = abap_false.
-        ev_message = 'Invalid source layout key'.
+        ev_message = 'Layout key is invalid'.
         es_layout-status = gc_status_error.
-
       WHEN 2.
-
         ev_success = abap_false.
-        ev_message = 'Source layout was not found'.
+        ev_message = 'Layout was not found'.
         es_layout-status = gc_status_error.
-
       WHEN 3.
-
         ev_success = abap_false.
-        ev_message = 'Source system could not delete the layout'.
+        ev_message = 'Remote system could not delete the layout'.
         es_layout-status = gc_status_error.
-
-      WHEN 4 OR 5.
-
+      WHEN 4.
         ev_success = abap_false.
-
+        ev_message = 'Not authorised to delete the layout'.
+        es_layout-status = gc_status_error.
+      WHEN 5 OR 6.
+        ev_success = abap_false.
         IF lv_rfc_message IS INITIAL.
-          ev_message = 'RFC connection or source-system error'.
+          ev_message = 'RFC connection or remote-system error'.
         ELSE.
           ev_message = lv_rfc_message.
         ENDIF.
-
         es_layout-status = gc_status_error.
-
       WHEN OTHERS.
-
         ev_success = abap_false.
-        ev_message = 'Unexpected error deleting the source layout'.
+        ev_message = 'Unexpected error deleting the layout'.
         es_layout-status = gc_status_error.
-
     ENDCASE.
 
-*---------------------------------------------------------------------*
-* Local deletion in target system
-*---------------------------------------------------------------------*
-  ELSE.
-
-    ls_key = me->build_target_key(
-      is_layout       = is_layout
-      iv_targetreport = iv_targetreport
-      iv_targetuser   = iv_targetuser
-      iv_global       = iv_global ).
-
-*    IF iv_test = abap_true.
-
-      IF me->layout_exists(
-           is_key = ls_key ) = abap_true.
-
-        ev_success = abap_true.
-        ev_message = 'Target layout can be deleted'.
-        es_layout-status = gc_status_ready.
-
-      ELSE.
-
-        ev_success = abap_false.
-        ev_message = 'Target layout was not found'.
-        es_layout-status = gc_status_error.
-
-      ENDIF.
-
-      es_layout-message = ev_message.
-      RETURN.
-
-*    ENDIF.
-
-    me->delete_by_key(
-      EXPORTING
-        is_key     = ls_key
-      IMPORTING
-        ev_success = ev_success
-        ev_message = ev_message ).
-
-    IF ev_success = abap_true.
-      es_layout-status = gc_status_deleted.
-    ELSE.
-      es_layout-status = gc_status_error.
-    ENDIF.
-
-  ENDIF.
-
-*---------------------------------------------------------------------*
-* Return operation message in the ALV row
-*---------------------------------------------------------------------*
-  es_layout-message = ev_message.
+    es_layout-message = ev_message.
 
   ENDMETHOD.
 
@@ -988,7 +916,9 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
     EXPORTING
       is_varkey    = ls_write_varkey
       is_variant   = ls_variant
-      iv_overwrite = iv_overwrite
+      iv_overwrite  = iv_overwrite
+      iv_source_rfc = iv_target_rfcdst
+      iv_target_rfc = iv_source_rfcdst
     IMPORTING
       ev_success   = ev_success
       ev_message   = ev_message
@@ -998,15 +928,11 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
       it_dbfilter   = ls_detail-dbfilter
       it_dblayout   = ls_detail-dblayout
     EXCEPTIONS
-      invalid_key           = 1
-      already_exists        = 2
-      not_authorised        = 3
-      write_failed          = 4
-      system_failure        = 5
-        MESSAGE lv_rfc_message
-      communication_failure = 6
-        MESSAGE lv_rfc_message
-      OTHERS                = 7.
+      variant_already_exists = 1
+      write_failed           = 2
+      system_failure         = 3 MESSAGE lv_rfc_message
+      communication_failure  = 4 MESSAGE lv_rfc_message
+      OTHERS                 = 5.
 
 *---------------------------------------------------------------------*
 * Interpret RFC result
@@ -1273,7 +1199,7 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
         EXPORTING
           iv_report             = ls_report-low
           iv_user               = iv_user
-          iv_variant            = ls_variant
+          iv_variant            = ls_variant-variant
         TABLES
           et_ltdx               = lt_ltdx
           et_ltdxt              = lt_ltdxt
@@ -1444,7 +1370,7 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
 * | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
 * | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
 * +--------------------------------------------------------------------------------------</SIGNATURE>
-METHOD get_target_layouts.
+METHOD GET_TARGET_LAYOUTS.
 
   DATA:
     lt_ltdx        TYPE STANDARD TABLE OF ltdx,
@@ -1510,7 +1436,7 @@ METHOD get_target_layouts.
       EXPORTING
         iv_report             = ls_report-low
         iv_user               = iv_user
-        iv_variant            = ls_variant
+        iv_variant            = ls_variant-variant
       TABLES
         et_ltdx               = lt_ltdx
         et_ltdxt              = lt_ltdxt
@@ -1524,10 +1450,29 @@ METHOD get_target_layouts.
                                 MESSAGE lv_rfc_message
         OTHERS                = 6.
 
-    IF sy-subrc <> 0.
-      ev_message = lv_rfc_message.
-      RETURN.
-    ENDIF.
+    CASE sy-subrc.
+      WHEN 0.
+        " Continue processing the returned catalogue.
+      WHEN 2.
+        " No target layouts for this report is a valid result.
+        CONTINUE.
+      WHEN 1.
+        ev_message = 'Not authorised to list target layouts'.
+        RETURN.
+      WHEN 3.
+        ev_message = 'Target system could not read the layouts'.
+        RETURN.
+      WHEN 4 OR 5.
+        IF lv_rfc_message IS INITIAL.
+          ev_message = 'RFC connection or target-system error'.
+        ELSE.
+          ev_message = lv_rfc_message.
+        ENDIF.
+        RETURN.
+      WHEN OTHERS.
+        ev_message = 'Unexpected error reading target layouts'.
+        RETURN.
+    ENDCASE.
 
     SORT lt_ltdxt BY
       relid
@@ -1595,6 +1540,12 @@ METHOD get_target_layouts.
       type.
 
   ev_success = abap_true.
+  mt_alv2data = et_layouts.
+    IF et_layouts IS INITIAL.
+    ev_message = 'No target layouts matched the selection'.
+    ELSE.
+    ev_message = 'Target layout catalogue retrieved'.
+  ENDIF.
 
 ENDMETHOD.
 
