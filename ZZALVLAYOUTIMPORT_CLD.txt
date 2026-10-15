@@ -1,0 +1,208 @@
+*&---------------------------------------------------------------------*
+*& Include          ZZALVLAYOUTIMPORT_CLD
+*&---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+* Local event-handler class definitions
+*---------------------------------------------------------------------*
+*
+* Tree  - Common filter and context selector
+* ALV1  - Source-system layouts
+* ALV2  - Target-system layouts
+* ALV3  - Source-to-target comparison
+*
+*---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+* Tree event handler
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver_tree1 DEFINITION.
+
+  PUBLIC SECTION.
+
+    METHODS:
+      node_double_click
+        FOR EVENT node_double_click
+        OF cl_gui_alv_tree_simple
+        IMPORTING
+          index_outtab
+          grouplevel.
+
+    METHODS:
+      item_double_click
+        FOR EVENT item_double_click
+        OF cl_gui_alv_tree_simple
+        IMPORTING
+          fieldname
+          index_outtab
+          grouplevel.
+
+ENDCLASS.
+
+*---------------------------------------------------------------------*
+* ALV1 event handler - Source-system layouts
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver_alv1 DEFINITION.
+
+  PUBLIC SECTION.
+
+    METHODS:
+      constructor.
+
+    METHODS:
+      handle_toolbar
+        FOR EVENT toolbar
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_object
+          e_interactive.
+
+    METHODS:
+      handle_double_click
+        FOR EVENT double_click
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_row
+          e_column.
+
+    METHODS:
+      handle_hotspot_click
+        FOR EVENT hotspot_click
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_row_id
+          e_column_id
+          es_row_no.
+
+    METHODS:
+      handle_user_command
+        FOR EVENT user_command
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_ucomm.
+
+    METHODS:
+      handle_data_changed
+        FOR EVENT data_changed
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_onf4
+          e_onf4_before
+          e_onf4_after
+          er_data_changed
+          e_ucomm
+          sender.
+
+ENDCLASS.
+
+*---------------------------------------------------------------------*
+* ALV2 event handler - Target-system layouts
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver_alv2 DEFINITION.
+
+  PUBLIC SECTION.
+
+    METHODS:
+      constructor.
+
+    METHODS:
+      handle_toolbar
+        FOR EVENT toolbar
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_object
+          e_interactive.
+
+    METHODS:
+      handle_double_click
+        FOR EVENT double_click
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_row
+          e_column.
+
+    METHODS:
+      handle_hotspot_click
+        FOR EVENT hotspot_click
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_row_id
+          e_column_id
+          es_row_no.
+
+    METHODS:
+      handle_user_command
+        FOR EVENT user_command
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_ucomm.
+
+    METHODS:
+      handle_data_changed
+        FOR EVENT data_changed
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_onf4
+          e_onf4_before
+          e_onf4_after
+          er_data_changed
+          e_ucomm
+          sender.
+
+ENDCLASS.
+
+*---------------------------------------------------------------------*
+* ALV3 event handler - Source-to-target comparison
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver_alv3 DEFINITION.
+
+  PUBLIC SECTION.
+
+    METHODS:
+      constructor.
+
+    METHODS:
+      handle_toolbar
+        FOR EVENT toolbar
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_object
+          e_interactive.
+
+    METHODS:
+      handle_double_click
+        FOR EVENT double_click
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_row
+          e_column.
+
+    METHODS:
+      handle_hotspot_click
+        FOR EVENT hotspot_click
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_row_id
+          e_column_id
+          es_row_no.
+
+    METHODS:
+      handle_user_command
+        FOR EVENT user_command
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_ucomm.
+
+    METHODS:
+      handle_data_changed
+        FOR EVENT data_changed
+        OF cl_gui_alv_grid
+        IMPORTING
+          e_onf4
+          e_onf4_before
+          e_onf4_after
+          er_data_changed
+          e_ucomm
+          sender.
+
+ENDCLASS.
