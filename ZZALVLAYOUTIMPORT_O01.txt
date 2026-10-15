@@ -1,0 +1,585 @@
+*&---------------------------------------------------------------------*
+*& Include          ZZALVLAYOUTIMPORT_O01
+*&---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+* PBO module for screen 9900
+*---------------------------------------------------------------------*
+MODULE status_9900 OUTPUT.
+
+  DATA lt_fcode TYPE TABLE OF sy-ucomm.
+
+  SET PF-STATUS 'STANDARD_FULLSCREEN'
+    EXCLUDING lt_fcode.
+
+  SET TITLEBAR 'ZALVLAYOUTIMPORT'.
+
+  IF left_container1 IS NOT BOUND
+     OR alv_grid1 IS NOT BOUND
+     OR alv_grid2 IS NOT BOUND
+     OR alv_grid3 IS NOT BOUND.
+
+    PERFORM create_and_init_controls.
+
+  ELSE.
+
+    PERFORM show_current_page.
+
+  ENDIF.
+
+ENDMODULE.
+
+
+*---------------------------------------------------------------------*
+* Create and initialise all screen controls
+*---------------------------------------------------------------------*
+FORM create_and_init_controls.
+
+  CLASS cl_gui_cfw DEFINITION LOAD.
+
+  PERFORM create_left_container.
+  PERFORM create_selector_tree.
+
+  PERFORM create_top_container1.
+  PERFORM create_top_container2.
+  PERFORM create_top_container3.
+
+  PERFORM create_alvtable1.
+  PERFORM create_alvtable2.
+  PERFORM create_alvtable3.
+
+  PERFORM build_alv1.
+  PERFORM build_alv2.
+  PERFORM build_alv3.
+
+  PERFORM show_current_page.
+
+  CALL METHOD cl_gui_cfw=>flush
+    EXCEPTIONS
+      cntl_system_error = 1
+      cntl_error        = 2
+      OTHERS            = 3.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Error initialising the ALV controls'
+      TYPE 'S' DISPLAY LIKE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Create the docking container for the selector tree
+*---------------------------------------------------------------------*
+FORM create_left_container.
+
+  DATA:
+    lv_dynnr     TYPE sy-dynnr,
+    lv_extension TYPE i.
+
+  IF left_container1 IS BOUND.
+    RETURN.
+  ENDIF.
+
+  lv_dynnr     = sy-dynnr.
+  lv_extension = 300.
+
+  CREATE OBJECT left_container1
+    EXPORTING
+      repid     = gv_repid
+      dynnr     = lv_dynnr
+      side      = cl_gui_docking_container=>dock_at_left
+      extension = lv_extension
+    EXCEPTIONS
+      cntl_error                  = 1
+      cntl_system_error           = 2
+      create_error                = 3
+      lifetime_error              = 4
+      lifetime_dynpro_dynpro_link = 5
+      OTHERS                      = 6.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not create the selector container'
+      TYPE 'E'.
+  ENDIF.
+
+  CALL METHOD left_container1->set_visible
+    EXPORTING
+      visible = abap_true.
+
+  gv_visible_tree = abap_true.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Create and display the selector tree
+*---------------------------------------------------------------------*
+FORM create_selector_tree.
+
+  DATA:
+    ls_variant TYPE disvariant.
+
+  IF alv_tree1 IS BOUND.
+    RETURN.
+  ENDIF.
+
+  " Tree data must already have been prepared in F01
+  IF <gt_alvtree1> IS NOT ASSIGNED.
+    PERFORM alv_tree_data.
+  ENDIF.
+
+  IF <gt_alvtree1> IS NOT ASSIGNED.
+    MESSAGE 'Selector tree data is not available'
+      TYPE 'E'.
+  ENDIF.
+
+  IF gt_fieldcat1t IS INITIAL.
+    MESSAGE 'Selector tree field catalogue is empty'
+      TYPE 'E'.
+  ENDIF.
+
+  IF gt_sort_tree IS INITIAL.
+    PERFORM build_sort_table_tree.
+  ENDIF.
+
+  CREATE OBJECT alv_tree1
+    EXPORTING
+      i_parent                 = left_container1
+      i_node_selection_mode    =
+        cl_gui_column_tree=>node_sel_mode_single
+      i_item_selection         = abap_true
+      i_no_html_header         = abap_true
+      i_no_toolbar             = abap_false
+    EXCEPTIONS
+      cntl_error                  = 1
+      cntl_system_error           = 2
+      create_error                = 3
+      lifetime_error              = 4
+      illegal_node_selection_mode = 5
+      failed                      = 6
+      illegal_column_name         = 7
+      OTHERS                      = 8.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not create the selector tree'
+      TYPE 'E'.
+  ENDIF.
+
+  " Register tree events before first display
+  PERFORM register_events_tree.
+
+  CLEAR ls_variant.
+
+  ls_variant-report = gv_repid.
+  ls_variant-handle = 'TREE'.
+
+  CALL METHOD alv_tree1->set_table_for_first_display
+    EXPORTING
+      i_save          = space
+      is_variant      = ls_variant
+    CHANGING
+      it_sort         = gt_sort_tree
+      it_outtab       = <gt_alvtree1>
+      it_fieldcatalog = gt_fieldcat1t.
+
+  " Optimise the selector tree column widths
+  CALL METHOD alv_tree1->column_optimize.
+
+  " Expand the report hierarchy
+  CALL METHOD alv_tree1->expand_tree
+    EXPORTING
+      i_level = 1
+    EXCEPTIONS
+      failed  = 1
+      OTHERS  = 2.
+
+  CALL METHOD alv_tree1->frontend_update.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Register selector tree events
+*---------------------------------------------------------------------*
+FORM register_events_tree.
+
+  DATA:
+    lt_events TYPE cntl_simple_events,
+    ls_event  TYPE cntl_simple_event.
+
+  CLEAR lt_events.
+
+  " Register node double-click
+  CLEAR ls_event.
+
+  ls_event-eventid =
+    cl_gui_column_tree=>eventid_node_double_click.
+
+  APPEND ls_event TO lt_events.
+
+  " Register item double-click
+  CLEAR ls_event.
+
+  ls_event-eventid =
+    cl_gui_column_tree=>eventid_item_double_click.
+
+  APPEND ls_event TO lt_events.
+
+  CALL METHOD alv_tree1->set_registered_events
+    EXPORTING
+      events                    = lt_events
+    EXCEPTIONS
+      cntl_error                = 1
+      cntl_system_error         = 2
+      illegal_event_combination = 3
+      OTHERS                    = 4.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not register selector tree events'
+      TYPE 'E'.
+  ENDIF.
+
+  " Keep the event receiver globally referenced
+  IF go_event_receiver_tree1 IS NOT BOUND.
+    CREATE OBJECT go_event_receiver_tree1.
+  ENDIF.
+
+  SET HANDLER
+    go_event_receiver_tree1->node_double_click
+    FOR alv_tree1.
+
+  SET HANDLER
+    go_event_receiver_tree1->item_double_click
+    FOR alv_tree1.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Create the main ALV docking container
+*---------------------------------------------------------------------*
+FORM create_top_container1.
+
+  PERFORM create_page_container
+    USING gc_page_alv1
+    CHANGING top_container1.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Create the main CL_GUI_ALV_GRID instance
+*---------------------------------------------------------------------*
+FORM create_alvtable1.
+
+  PERFORM create_alv_grid
+    USING top_container1
+    CHANGING alv_grid1.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Build and display the main layout catalogue ALV
+*---------------------------------------------------------------------*
+FORM build_alv1.
+
+  DATA ls_variant TYPE disvariant.
+
+  IF alv_grid1 IS NOT BOUND.
+    MESSAGE 'The source ALV grid is not available' TYPE 'E'.
+  ENDIF.
+
+  IF gt_fieldcat1 IS INITIAL.
+    PERFORM build_fieldcat_alv1.
+  ENDIF.
+
+  CLEAR: gs_alv_layout1, ls_variant.
+
+  ls_variant-report = gv_repid.
+  ls_variant-handle = 'ALV1'.
+
+  gs_alv_layout1-zebra      = abap_true.
+  gs_alv_layout1-sel_mode   = 'A'.
+  gs_alv_layout1-grid_title = 'Source ALV Layouts'.
+  gs_alv_layout1-smalltitle = abap_true.
+  gs_alv_layout1-cwidth_opt = abap_true.
+
+  PERFORM build_toolbar_exclusions
+    USING alv_grid1
+    CHANGING gt_toolbar1_ex.
+
+  CALL METHOD alv_grid1->set_table_for_first_display
+    EXPORTING
+      is_variant           = ls_variant
+      i_save               = 'A'
+      i_default            = abap_true
+      is_layout            = gs_alv_layout1
+      it_toolbar_excluding = gt_toolbar1_ex
+    CHANGING
+      it_fieldcatalog      = gt_fieldcat1
+      it_outtab            = gt_alv1
+    EXCEPTIONS
+      invalid_parameter_combination = 1
+      program_error                 = 2
+      too_many_lines                = 3
+      OTHERS                        = 4.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not display source layouts' TYPE 'E'.
+  ENDIF.
+
+  alv_grid1->register_edit_event(
+    i_event_id = cl_gui_alv_grid=>mc_evt_enter ).
+  alv_grid1->register_edit_event(
+    i_event_id = cl_gui_alv_grid=>mc_evt_modified ).
+
+  IF go_event_receiver_alv1 IS NOT BOUND.
+    CREATE OBJECT go_event_receiver_alv1.
+  ENDIF.
+
+  SET HANDLER go_event_receiver_alv1->handle_double_click FOR alv_grid1.
+  SET HANDLER go_event_receiver_alv1->handle_hotspot_click FOR alv_grid1.
+  SET HANDLER go_event_receiver_alv1->handle_user_command FOR alv_grid1.
+  SET HANDLER go_event_receiver_alv1->handle_data_changed FOR alv_grid1.
+
+  alv_grid1->set_toolbar_interactive( ).
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Exclude selected standard ALV toolbar functions
+*---------------------------------------------------------------------*
+FORM build_toolbar_exclusions
+  USING
+    io_grid TYPE REF TO cl_gui_alv_grid
+  CHANGING
+    ct_excluding TYPE ui_functions.
+
+  IF ct_excluding IS NOT INITIAL.
+    RETURN.
+  ENDIF.
+
+  APPEND io_grid->mc_fc_graph             TO ct_excluding.
+  APPEND io_grid->mc_fc_info              TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_append_row    TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_copy          TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_copy_row      TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_cut           TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_delete_row    TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_insert_row    TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_move_row      TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_paste         TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_paste_new_row TO ct_excluding.
+  APPEND io_grid->mc_fc_loc_undo          TO ct_excluding.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Create ALV page containers
+*---------------------------------------------------------------------*
+FORM create_top_container2.
+  PERFORM create_page_container
+    USING gc_page_alv2
+    CHANGING top_container2.
+ENDFORM.
+
+FORM create_top_container3.
+  PERFORM create_page_container
+    USING gc_page_alv3
+    CHANGING top_container3.
+ENDFORM.
+
+FORM create_page_container
+  USING
+    iv_page TYPE i
+  CHANGING
+    co_container TYPE REF TO cl_gui_docking_container.
+
+  IF co_container IS BOUND.
+    RETURN.
+  ENDIF.
+
+  CREATE OBJECT co_container
+    EXPORTING
+      repid     = gv_repid
+      dynnr     = sy-dynnr
+      side      = cl_gui_docking_container=>dock_at_top
+      extension = 1000
+    EXCEPTIONS
+      cntl_error                  = 1
+      cntl_system_error           = 2
+      create_error                = 3
+      lifetime_error              = 4
+      lifetime_dynpro_dynpro_link = 5
+      OTHERS                      = 6.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not create an ALV page container' TYPE 'E'.
+  ENDIF.
+
+  co_container->set_height( height = 1000 ).
+
+  IF iv_page = gc_page_alv1.
+    co_container->set_visible( visible = abap_true ).
+  ELSE.
+    co_container->set_visible( visible = abap_false ).
+  ENDIF.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Create ALV grid instances
+*---------------------------------------------------------------------*
+FORM create_alvtable2.
+  PERFORM create_alv_grid
+    USING top_container2
+    CHANGING alv_grid2.
+ENDFORM.
+
+FORM create_alvtable3.
+  PERFORM create_alv_grid
+    USING top_container3
+    CHANGING alv_grid3.
+ENDFORM.
+
+FORM create_alv_grid
+  USING
+    io_parent TYPE REF TO cl_gui_docking_container
+  CHANGING
+    co_grid TYPE REF TO cl_gui_alv_grid.
+
+  IF co_grid IS BOUND.
+    RETURN.
+  ENDIF.
+
+  CREATE OBJECT co_grid
+    EXPORTING
+      i_parent = io_parent
+    EXCEPTIONS
+      error_cntl_create = 1
+      error_cntl_init   = 2
+      error_cntl_link   = 3
+      error_dp_create   = 4
+      OTHERS            = 5.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not create an ALV grid' TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Build ALV2 - Local target layouts
+*---------------------------------------------------------------------*
+FORM build_alv2.
+
+  DATA ls_variant TYPE disvariant.
+
+  IF alv_grid2 IS NOT BOUND.
+    MESSAGE 'The target ALV grid is not available' TYPE 'E'.
+  ENDIF.
+
+  IF gt_fieldcat2 IS INITIAL.
+    PERFORM build_fieldcat_alv2.
+  ENDIF.
+
+  CLEAR: gs_alv_layout2, ls_variant.
+
+  ls_variant-report = gv_repid.
+  ls_variant-handle = 'ALV2'.
+
+  gs_alv_layout2-zebra      = abap_true.
+  gs_alv_layout2-sel_mode   = 'A'.
+  gs_alv_layout2-grid_title = 'Target ALV Layouts'.
+  gs_alv_layout2-smalltitle = abap_true.
+  gs_alv_layout2-cwidth_opt = abap_true.
+
+  PERFORM build_toolbar_exclusions
+    USING alv_grid2
+    CHANGING gt_toolbar2_ex.
+
+  alv_grid2->set_table_for_first_display(
+    EXPORTING
+      is_variant           = ls_variant
+      i_save               = 'A'
+      i_default            = abap_true
+      is_layout            = gs_alv_layout2
+      it_toolbar_excluding = gt_toolbar2_ex
+    CHANGING
+      it_fieldcatalog      = gt_fieldcat2
+      it_outtab            = gt_alv2 ).
+
+  alv_grid2->register_edit_event(
+    i_event_id = cl_gui_alv_grid=>mc_evt_enter ).
+  alv_grid2->register_edit_event(
+    i_event_id = cl_gui_alv_grid=>mc_evt_modified ).
+
+  IF go_event_receiver_alv2 IS NOT BOUND.
+    CREATE OBJECT go_event_receiver_alv2.
+  ENDIF.
+
+  SET HANDLER go_event_receiver_alv2->handle_double_click FOR alv_grid2.
+  SET HANDLER go_event_receiver_alv2->handle_hotspot_click FOR alv_grid2.
+  SET HANDLER go_event_receiver_alv2->handle_user_command FOR alv_grid2.
+  SET HANDLER go_event_receiver_alv2->handle_data_changed FOR alv_grid2.
+
+  alv_grid2->set_toolbar_interactive( ).
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Build ALV3 - Source-to-target comparison
+*---------------------------------------------------------------------*
+FORM build_alv3.
+
+  DATA ls_variant TYPE disvariant.
+
+  IF alv_grid3 IS NOT BOUND.
+    MESSAGE 'The comparison ALV grid is not available' TYPE 'E'.
+  ENDIF.
+
+  IF gt_fieldcat3 IS INITIAL.
+    PERFORM build_fieldcat_alv3.
+  ENDIF.
+
+  CLEAR: gs_alv_layout3, ls_variant.
+
+  ls_variant-report = gv_repid.
+  ls_variant-handle = 'ALV3'.
+
+  gs_alv_layout3-zebra      = abap_true.
+  gs_alv_layout3-sel_mode   = 'A'.
+  gs_alv_layout3-grid_title = 'Source vs Target Comparison'.
+  gs_alv_layout3-smalltitle = abap_true.
+  gs_alv_layout3-cwidth_opt = abap_true.
+
+  PERFORM build_toolbar_exclusions
+    USING alv_grid3
+    CHANGING gt_toolbar3_ex.
+
+  alv_grid3->set_table_for_first_display(
+    EXPORTING
+      is_variant           = ls_variant
+      i_save               = 'A'
+      i_default            = abap_true
+      is_layout            = gs_alv_layout3
+      it_toolbar_excluding = gt_toolbar3_ex
+    CHANGING
+      it_fieldcatalog      = gt_fieldcat3
+      it_outtab            = gt_alv3 ).
+
+  IF go_event_receiver_alv3 IS NOT BOUND.
+    CREATE OBJECT go_event_receiver_alv3.
+  ENDIF.
+
+  SET HANDLER go_event_receiver_alv3->handle_double_click FOR alv_grid3.
+  SET HANDLER go_event_receiver_alv3->handle_hotspot_click FOR alv_grid3.
+  SET HANDLER go_event_receiver_alv3->handle_user_command FOR alv_grid3.
+
+  alv_grid3->set_toolbar_interactive( ).
+
+ENDFORM.
+

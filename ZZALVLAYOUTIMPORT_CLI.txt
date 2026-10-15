@@ -1,0 +1,249 @@
+*&---------------------------------------------------------------------*
+*& Include          ZALVLAYOUTIMPORT_CLI
+*&---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+* Tree Event Handler
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver_tree1 IMPLEMENTATION.
+
+  METHOD node_double_click.
+
+*   Reserved for future use.
+
+  ENDMETHOD.
+
+  METHOD item_double_click.
+
+*   Tree controls filtering only.
+*   The selected tree node will later populate GS_CONTEXT and all three
+*   ALVs will be refreshed using the same filter context.
+
+    gv_refresh_alv1 = abap_true.
+    gv_refresh_alv2 = abap_true.
+    gv_refresh_alv3 = abap_true.
+
+    gv_refresh_grid = abap_true.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+*---------------------------------------------------------------------*
+* ALV1 - Source Layouts
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver_alv1 IMPLEMENTATION.
+
+  METHOD constructor.
+
+    SET HANDLER handle_toolbar
+      FOR alv_grid1.
+
+    CALL METHOD alv_grid1->set_toolbar_interactive.
+
+  ENDMETHOD.
+
+
+  METHOD handle_toolbar.
+
+    PERFORM modify_toolbar_alv1
+      TABLES e_object->mt_toolbar.
+
+  ENDMETHOD.
+
+
+  METHOD handle_hotspot_click.
+
+    CALL METHOD handle_double_click
+      EXPORTING
+        e_row    = e_row_id
+        e_column = e_column_id.
+
+  ENDMETHOD.
+
+
+  METHOD handle_double_click.
+
+    READ TABLE gt_alv1
+      INTO gs_alv1
+      INDEX e_row.
+
+    CHECK sy-subrc = 0.
+
+*   Future:
+*   Populate ALV2 and ALV3 detail context.
+
+  ENDMETHOD.
+
+
+  METHOD handle_user_command.
+
+    PERFORM user_command
+      USING e_ucomm.
+
+    IF gv_refresh_grid = abap_true.
+
+      PERFORM refresh_alv_report
+        USING gv_stable_row
+              gv_stable_col.
+
+      gv_refresh_grid = abap_false.
+
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD handle_data_changed.
+
+    DATA:
+      lt_mod_cells TYPE lvc_t_modi,
+      ls_mod_cell  TYPE lvc_s_modi.
+
+    FIELD-SYMBOLS:
+      <ls_alv1> TYPE zcl_alvlayoutmgr=>ty_alv1data.
+
+    lt_mod_cells = er_data_changed->mt_mod_cells.
+
+    LOOP AT lt_mod_cells
+      INTO ls_mod_cell.
+
+      READ TABLE gt_alv1
+        ASSIGNING <ls_alv1>
+        INDEX ls_mod_cell-row_id.
+
+      IF sy-subrc = 0.
+
+        IF <ls_alv1>-status IS INITIAL.
+          <ls_alv1>-status = 'CHANGED'.
+        ENDIF.
+
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+
+*---------------------------------------------------------------------*
+* ALV2 - Target Layouts
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver_alv2 IMPLEMENTATION.
+
+  METHOD constructor.
+
+    SET HANDLER handle_toolbar
+      FOR alv_grid2.
+
+    CALL METHOD alv_grid2->set_toolbar_interactive.
+
+  ENDMETHOD.
+
+
+  METHOD handle_toolbar.
+
+    PERFORM modify_toolbar_alv2
+      TABLES e_object->mt_toolbar.
+
+  ENDMETHOD.
+
+
+  METHOD handle_hotspot_click.
+
+    CALL METHOD handle_double_click
+      EXPORTING
+        e_row    = e_row_id
+        e_column = e_column_id.
+
+  ENDMETHOD.
+
+
+  METHOD handle_double_click.
+
+    READ TABLE gt_alv2
+      INTO gs_alv2
+      INDEX e_row.
+
+    CHECK sy-subrc = 0.
+
+  ENDMETHOD.
+
+
+  METHOD handle_user_command.
+
+    PERFORM user_command
+      USING e_ucomm.
+
+  ENDMETHOD.
+
+
+  METHOD handle_data_changed.
+
+*   ALV2 is display-oriented.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+
+*---------------------------------------------------------------------*
+* ALV3 - Comparison
+*---------------------------------------------------------------------*
+CLASS lcl_event_receiver_alv3 IMPLEMENTATION.
+
+  METHOD constructor.
+
+    SET HANDLER handle_toolbar
+      FOR alv_grid3.
+
+    CALL METHOD alv_grid3->set_toolbar_interactive.
+
+  ENDMETHOD.
+
+
+  METHOD handle_toolbar.
+
+    PERFORM modify_toolbar_alv3
+      TABLES e_object->mt_toolbar.
+
+  ENDMETHOD.
+
+
+  METHOD handle_hotspot_click.
+
+    CALL METHOD handle_double_click
+      EXPORTING
+        e_row    = e_row_id
+        e_column = e_column_id.
+
+  ENDMETHOD.
+
+
+  METHOD handle_double_click.
+
+    READ TABLE gt_alv3
+      INTO gs_alv3
+      INDEX e_row.
+
+    CHECK sy-subrc = 0.
+
+  ENDMETHOD.
+
+
+  METHOD handle_user_command.
+
+    PERFORM user_command
+      USING e_ucomm.
+
+  ENDMETHOD.
+
+
+  METHOD handle_data_changed.
+
+*   ALV3 is display-only.
+
+  ENDMETHOD.
+
+ENDCLASS.

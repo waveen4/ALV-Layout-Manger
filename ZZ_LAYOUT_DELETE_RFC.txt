@@ -1,0 +1,144 @@
+FUNCTION ZZ_LAYOUT_DELETE_RFC .
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IS_VARKEY) TYPE  LTDXKEY
+*"     VALUE(IV_TEST) TYPE  CHAR1
+*"  EXPORTING
+*"     VALUE(EV_SUCCESS) TYPE  CHAR1
+*"     VALUE(EV_MESSAGE) TYPE  BAPI_MSG
+*"  EXCEPTIONS
+*"      NOT_FOUND
+*"      DELETE_FAILED
+*"      NOT_AUTHORISED
+*"      INVALID_KEY
+*"----------------------------------------------------------------------
+
+ DATA:
+    lv_report TYPE ltdx-report,
+    lv_dbcnt  TYPE i.
+
+  CLEAR:
+    ev_success,
+    ev_message.
+
+*---------------------------------------------------------------------*
+* Validate key
+*---------------------------------------------------------------------*
+
+  IF is_varkey-report IS INITIAL
+     OR is_varkey-variant IS INITIAL.
+
+    RAISE invalid_key.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Optional authorization check
+*---------------------------------------------------------------------*
+*
+* Example:
+*
+* AUTHORITY-CHECK OBJECT 'E_VARIANT'
+*   ID 'ACTVT' FIELD '06'.
+*
+* IF sy-subrc <> 0.
+*   RAISE not_authorised.
+* ENDIF.
+*
+*---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+* Check existence
+*---------------------------------------------------------------------*
+
+  SELECT SINGLE report
+    FROM ltdx
+    INTO lv_report
+   WHERE relid     = 'LT'
+     AND report    = is_varkey-report
+     AND handle    = is_varkey-handle
+     AND log_group = is_varkey-log_group
+     AND username  = is_varkey-username
+     AND variant   = is_varkey-variant
+     AND type      = is_varkey-type.
+
+  IF sy-subrc <> 0.
+
+    RAISE not_found.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Test mode
+*---------------------------------------------------------------------*
+
+  IF iv_test = abap_true.
+
+    ev_success = abap_true.
+
+    ev_message =
+      |Layout { is_varkey-variant } can be deleted|.
+
+    RETURN.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Delete language dependent texts
+*---------------------------------------------------------------------*
+
+  DELETE FROM ltdxt
+   WHERE relid     = 'LT'
+     AND report    = is_varkey-report
+     AND handle    = is_varkey-handle
+     AND log_group = is_varkey-log_group
+     AND username  = is_varkey-username
+     AND variant   = is_varkey-variant
+     AND type      = is_varkey-type.
+
+*---------------------------------------------------------------------*
+* Delete layout itself
+*---------------------------------------------------------------------*
+
+  DELETE FROM ltdx
+   WHERE relid     = 'LT'
+     AND report    = is_varkey-report
+     AND handle    = is_varkey-handle
+     AND log_group = is_varkey-log_group
+     AND username  = is_varkey-username
+     AND variant   = is_varkey-variant
+     AND type      = is_varkey-type.
+
+  lv_dbcnt = sy-dbcnt.
+
+*---------------------------------------------------------------------*
+* Verify delete
+*---------------------------------------------------------------------*
+
+  IF lv_dbcnt = 0.
+
+    ROLLBACK WORK.
+
+    RAISE delete_failed.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Commit
+*---------------------------------------------------------------------*
+
+  COMMIT WORK AND WAIT.
+
+*---------------------------------------------------------------------*
+* Success
+*---------------------------------------------------------------------*
+
+  ev_success = abap_true.
+
+  ev_message =
+    |Layout { is_varkey-variant } deleted successfully|.
+
+
+
+ENDFUNCTION.
