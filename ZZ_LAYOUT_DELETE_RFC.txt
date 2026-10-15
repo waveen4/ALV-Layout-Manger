@@ -3,7 +3,6 @@ FUNCTION ZZ_LAYOUT_DELETE_RFC .
 *"*"Local Interface:
 *"  IMPORTING
 *"     VALUE(IS_VARKEY) TYPE  LTDXKEY
-*"     VALUE(IV_TEST) TYPE  CHAR1
 *"  EXPORTING
 *"     VALUE(EV_SUCCESS) TYPE  CHAR1
 *"     VALUE(EV_MESSAGE) TYPE  BAPI_MSG
@@ -69,20 +68,20 @@ FUNCTION ZZ_LAYOUT_DELETE_RFC .
 
   ENDIF.
 
-*---------------------------------------------------------------------*
-* Test mode
-*---------------------------------------------------------------------*
-
-  IF iv_test = abap_true.
-
-    ev_success = abap_true.
-
-    ev_message =
-      |Layout { is_varkey-variant } can be deleted|.
-
-    RETURN.
-
-  ENDIF.
+**---------------------------------------------------------------------*
+** Test mode
+**---------------------------------------------------------------------*
+*
+*  IF iv_test = abap_true.
+*
+*    ev_success = abap_true.
+*
+*    ev_message =
+*      |Layout { is_varkey-variant } can be deleted|.
+*
+*    RETURN.
+*
+*  ENDIF.
 
 *---------------------------------------------------------------------*
 * Delete language dependent texts

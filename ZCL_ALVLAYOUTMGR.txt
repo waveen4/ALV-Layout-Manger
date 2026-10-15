@@ -1262,9 +1262,7 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
         IF sy-subrc = 0
            AND ls_variant_sel-sign = 'I'
            AND ls_variant_sel-option = 'EQ'.
-
           ls_variant-variant = ls_variant_sel-low.
-
         ENDIF.
 
       ENDIF.
@@ -1275,7 +1273,7 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
         EXPORTING
           iv_report             = ls_report-low
           iv_user               = iv_user
-          iv_variant            = ls_variant-variant
+          iv_variant            = ls_variant
         TABLES
           et_ltdx               = lt_ltdx
           et_ltdxt              = lt_ltdxt
