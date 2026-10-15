@@ -1,0 +1,252 @@
+FUNCTION ZZ_LAYOUT_WRITE_RFC .
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IS_VARKEY) TYPE  LTDXKEY
+*"     VALUE(IS_VARIANT) TYPE  DISVARIANT
+*"     VALUE(IV_OVERWRITE) TYPE  XFELD
+*"     VALUE(IV_SOURCE_RFC) TYPE  RFCDEST
+*"     VALUE(IV_TARGET_RFC) TYPE  RFCDEST
+*"  EXPORTING
+*"     VALUE(EV_SUCCESS) TYPE  CHAR1
+*"     VALUE(EV_MESSAGE) TYPE  BAPI_MSG
+*"  TABLES
+*"      IT_DBFIELDCAT STRUCTURE  LTDXDATA
+*"      IT_DBSORTINFO STRUCTURE  LTDXDATA
+*"      IT_DBFILTER STRUCTURE  LTDXDATA
+*"      IT_DBLAYOUT STRUCTURE  LTDXDATA
+*"  EXCEPTIONS
+*"      VARIANT_ALREADY_EXISTS
+*"      WRITE_FAILED
+*"----------------------------------------------------------------------
+
+DATA:
+    ls_ltdx          TYPE ltdx,
+    ls_ltdxt         TYPE ltdxt,
+    lv_layout_exists TYPE abap_bool.
+
+  CLEAR:
+    ev_success,
+    ev_message,
+    ls_ltdx,
+    ls_ltdxt,
+    lv_layout_exists.
+
+*---------------------------------------------------------------------*
+* Validate destination context
+*---------------------------------------------------------------------*
+  IF iv_source_rfc IS NOT INITIAL
+     AND iv_target_rfc IS NOT INITIAL
+     AND iv_source_rfc = iv_target_rfc.
+
+    ev_success = abap_false.
+    ev_message =
+      'Source and target RFC destinations must be different'.
+
+    RAISE write_failed.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Validate layout key
+*---------------------------------------------------------------------*
+  IF is_varkey-report IS INITIAL
+     OR is_varkey-variant IS INITIAL.
+
+    ev_success = abap_false.
+    ev_message = 'Layout key is incomplete'.
+
+    RAISE write_failed.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Validate variant identity
+*---------------------------------------------------------------------*
+  IF is_variant-report IS NOT INITIAL
+     AND is_variant-report <> is_varkey-report.
+
+    ev_success = abap_false.
+    ev_message =
+      'Variant report does not match the layout key'.
+
+    RAISE write_failed.
+
+  ENDIF.
+
+  IF is_variant-variant IS NOT INITIAL
+     AND is_variant-variant <> is_varkey-variant.
+
+    ev_success = abap_false.
+    ev_message =
+      'Variant name does not match the layout key'.
+
+    RAISE write_failed.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Check whether the destination layout already exists
+*---------------------------------------------------------------------*
+  SELECT SINGLE *
+    FROM ltdx
+    INTO ls_ltdx
+   WHERE relid     = 'LT'
+     AND report    = is_varkey-report
+     AND handle    = is_varkey-handle
+     AND log_group = is_varkey-log_group
+     AND username  = is_varkey-username
+     AND variant   = is_varkey-variant
+     AND type      = is_varkey-type.
+
+  IF sy-subrc = 0.
+    lv_layout_exists = abap_true.
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Existing layout without overwrite permission
+*---------------------------------------------------------------------*
+  IF lv_layout_exists = abap_true
+     AND iv_overwrite IS INITIAL.
+
+    ev_success = abap_false.
+
+    ev_message =
+      |Layout { is_varkey-variant } already exists|.
+
+    RAISE variant_already_exists.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Delete the existing layout when overwrite is requested
+*---------------------------------------------------------------------*
+  IF lv_layout_exists = abap_true
+     AND iv_overwrite = abap_true.
+
+    DELETE FROM ltdxt
+     WHERE relid     = 'LT'
+       AND report    = is_varkey-report
+       AND handle    = is_varkey-handle
+       AND log_group = is_varkey-log_group
+       AND username  = is_varkey-username
+       AND variant   = is_varkey-variant
+       AND type      = is_varkey-type.
+
+    DELETE FROM ltdx
+     WHERE relid     = 'LT'
+       AND report    = is_varkey-report
+       AND handle    = is_varkey-handle
+       AND log_group = is_varkey-log_group
+       AND username  = is_varkey-username
+       AND variant   = is_varkey-variant
+       AND type      = is_varkey-type.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Write the complete layout definition
+*---------------------------------------------------------------------*
+  CALL FUNCTION 'LT_DBDATA_WRITE_TO_LTDX'
+    EXPORTING
+      i_tool       = 'LT'
+      is_varkey    = is_varkey
+      is_variant   = is_variant
+    TABLES
+      t_dbfieldcat = it_dbfieldcat[]
+      t_dbsortinfo = it_dbsortinfo[]
+      t_dbfilter   = it_dbfilter[]
+      t_dblayout   = it_dblayout[]
+    EXCEPTIONS
+      not_found    = 1
+      wrong_relid  = 2
+      OTHERS       = 3.
+
+  CASE sy-subrc.
+
+    WHEN 0.
+      " Continue with the description update.
+
+    WHEN 1.
+
+      ROLLBACK WORK.
+
+      ev_success = abap_false.
+      ev_message =
+        'Layout write function could not save the layout'.
+
+      RAISE write_failed.
+
+    WHEN 2.
+
+      ROLLBACK WORK.
+
+      ev_success = abap_false.
+      ev_message =
+        'Layout write function rejected the layout type'.
+
+      RAISE write_failed.
+
+    WHEN OTHERS.
+
+      ROLLBACK WORK.
+
+      ev_success = abap_false.
+      ev_message =
+        'Unexpected error writing the layout definition'.
+
+      RAISE write_failed.
+
+  ENDCASE.
+
+*---------------------------------------------------------------------*
+* Save or update the language-dependent description
+*---------------------------------------------------------------------*
+  CLEAR ls_ltdxt.
+
+  MOVE-CORRESPONDING is_varkey
+    TO ls_ltdxt.
+
+  ls_ltdxt-relid = 'LT'.
+  ls_ltdxt-langu = sy-langu.
+  ls_ltdxt-text  = is_variant-text.
+
+  MODIFY ltdxt FROM ls_ltdxt.
+
+  IF sy-subrc <> 0.
+
+    ROLLBACK WORK.
+
+    ev_success = abap_false.
+    ev_message =
+      'Layout definition was written but its description could not be saved'.
+
+    RAISE write_failed.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Commit complete write operation
+*---------------------------------------------------------------------*
+  COMMIT WORK AND WAIT.
+
+*---------------------------------------------------------------------*
+* Return successful result
+*---------------------------------------------------------------------*
+  ev_success = abap_true.
+
+  IF iv_source_rfc IS NOT INITIAL
+     AND iv_target_rfc IS NOT INITIAL.
+
+    ev_message =
+      |Layout { is_varkey-variant } written from | &&
+      |{ iv_source_rfc } to { iv_target_rfc }|.
+
+  ELSE.
+
+    ev_message =
+      |Layout { is_varkey-variant } written successfully|.
+
+  ENDIF.
+
+ENDFUNCTION.

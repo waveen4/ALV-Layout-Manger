@@ -1,0 +1,135 @@
+FUNCTION zz_layout_get_list.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IV_REPORT) TYPE  SYREPID
+*"     VALUE(IV_USER) TYPE  SYUNAME OPTIONAL
+*"     VALUE(IV_VARIANT) TYPE  DISVARIANT OPTIONAL
+*"  TABLES
+*"      ET_LTDX STRUCTURE  LTDX
+*"      ET_LTDXT STRUCTURE  LTDXT
+*"  EXCEPTIONS
+*"      NOT_AUTHORISED
+*"      NO_LAYOUTS_FOUND
+*"      READ_ERROR
+*"----------------------------------------------------------------------
+
+*  DATA:
+*    lt_ltdx  TYPE STANDARD TABLE OF ltdx,
+*    lt_ltdx   TYPE ltdx,
+*    ls_result TYPE zalv_layout_list.
+
+  REFRESH: et_ltdx,
+           et_ltdxt.
+
+*-----------------------------------------------------------------------
+* Optional custom authorisation check
+*-----------------------------------------------------------------------
+* AUTHORITY-CHECK OBJECT 'Z_ALV_MIG'
+*   ID 'ACTVT* FIELD '03'.
+*
+* IF sy-subrc <> 0.**   RAISE not_authorised.
+* ENDIF.*
+*--------------------------------*----------------------------------*---
+* Report is mandatory
+*-------*----------------------------------*----------------------------
+  IF iv_report IS INITIAL.
+    RAISE read_error.
+  ENDIF.
+
+*---------------*----------------------------------*--------------------
+* Read matching layout headers
+*----------------*----------------------------------*-------------------
+  IF iv_user IS INITIAL AND iv_variant IS INITIAL.
+
+    SELECT *
+      FROM ltdx
+      INTO TABLE et_ltdx
+     WHERE relid  = 'LT'
+       AND report = iv_report.
+
+  ELSEIF iv_user IS NOT INITIAL AND iv_variant IS INITIAL.
+
+    SELECT *
+       FROM ltdx
+       INTO TABLE et_ltdx
+      WHERE relid   = 'LT'
+        AND report   = iv_report
+        AND username = iv_user.
+
+  ELSEIF iv_user IS INITIAL AND iv_variant IS NOT INITIAL.
+
+    SELECT *
+      FROM ltdx
+      INTO TABLE et_ltdx
+     WHERE relid  = 'LT'
+       AND report = iv_report
+      AND variant = iv_variant.
+
+  ELSE.
+
+    SELECT *
+      FROM ltdx
+      INTO TABLE et_ltdx
+     WHERE relid    = 'LT'
+       AND report  = iv_report
+       AND username = iv_user
+       AND variant  = iv_variant.
+
+  ENDIF.
+
+  IF et_ltdx[] IS INITIAL.
+    RAISE no_layouts_found.
+  ELSE.
+    SELECT * FROM ltdxt INTO table et_ltdxt
+      FOR ALL ENTRIES IN et_ltdx
+      WHERE relid = et_ltdx-relid
+        AND report = et_ltdx-report
+        AND handle = et_ltdx-handle
+        AND log_group = et_ltdx-log_group
+        AND username = et_ltdx-username
+        AND variant = et_ltdx-variant
+        AND type = et_ltdx-type
+        AND langu = sy-langu.
+
+ ENDIF.
+
+**----------------------*----------------------------------*-------------
+** Build RFC result l*st
+**------------------------------*----------------------------------*-----
+*    LOOP AT t_ltdx INTO ls_lt*x.
+*
+*      CLEAR ls_result.
+*
+*      ls_r*sult-report    = ls_ltdx-report.
+*      *  ls_result-handle    = ls_ltdx-ha*dle.
+*      ls_result-log_group = ls_*tdx-log_group.
+*      ls_result-usern*me  = ls_ltdx-username.
+*      ls_res*lt-variant   = ls_ltdx-variant.
+*      * ls_result-type      = ls_ltdx-typ*.
+*
+**------------------------------*----------------------------------*-----
+** Read description in logon *anguage
+**-------------------------*----------------------------------*----------
+*      SELECT SINGLE text
+**     FROM ltdxt
+*        INTO ls_resu*t-text
+*       WHERE relid     = 'LT'*       and report    = ls_ltdx-rep*rt
+*         and handle    = ls_ltdx-*andle
+*         and log_group = ls_lt*x-log_group
+*         and username  =*ls_ltdx-username
+*         and varian*   = ls_ltdx-variant
+*         and ty*e      = ls_ltdx-type
+*         and l*ngu     = sy-langu.
+*
+*      IF sy-sub*c <> 0.
+*        CLEAR ls_result-text*
+*      ENDIF.
+*
+*        APPEND ls_result *o et_layouts.
+*
+*      ENDLOOP.
+*
+*      SORT *t_layouts BY report username varia*t handle log_group type.
+
+    ENDFUNCTION.

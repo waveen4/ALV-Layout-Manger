@@ -1,0 +1,21 @@
+MODULE user_command_9900 INPUT.
+
+  CASE sy-ucomm.
+
+    WHEN '&F03'
+      OR '&F12'
+      OR '&F15'
+      OR 'BACK'
+      OR 'EXIT'
+      OR 'CANCEL'.
+
+      LEAVE TO SCREEN 0.
+
+    WHEN OTHERS.
+
+      PERFORM user_command
+        USING sy-ucomm.
+
+  ENDCASE.
+
+ENDMODULE.

@@ -1,0 +1,1362 @@
+*&---------------------------------------------------------------------*
+*& Include          ZALVLAYOUTIMPORT_F01
+*&---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+* Create application objects
+*---------------------------------------------------------------------*
+FORM class_objects.
+
+  IF go_layout_mgr IS NOT BOUND.
+    CREATE OBJECT go_layout_mgr.
+  ENDIF.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Validate source and target RFC destinations
+*---------------------------------------------------------------------*
+FORM validate_selection_screen.
+
+  DATA:
+    lv_rfc_message TYPE char255.
+
+*---------------------------------------------------------------------*
+* Mandatory destination checks
+*---------------------------------------------------------------------*
+  IF p_srfc IS INITIAL.
+    MESSAGE 'Source RFC destination is required'
+      TYPE 'E'.
+  ENDIF.
+
+  IF p_trfc IS INITIAL.
+    MESSAGE 'Target RFC destination is required'
+      TYPE 'E'.
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Source and target must be different destinations
+*---------------------------------------------------------------------*
+  IF p_srfc = p_trfc.
+    MESSAGE 'Source and target RFC destinations must be different'
+      TYPE 'E'.
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Verify source RFC destination
+*---------------------------------------------------------------------*
+  CLEAR lv_rfc_message.
+
+  CALL FUNCTION 'RFC_PING'
+    DESTINATION p_srfc
+    EXCEPTIONS
+      system_failure        = 1 MESSAGE lv_rfc_message
+      communication_failure = 2 MESSAGE lv_rfc_message
+      OTHERS                = 3.
+
+  IF sy-subrc <> 0.
+    IF lv_rfc_message IS INITIAL.
+      MESSAGE |Source RFC destination { p_srfc } is not reachable|
+        TYPE 'E'.
+    ELSE.
+      MESSAGE |Source RFC { p_srfc }: { lv_rfc_message }|
+        TYPE 'E'.
+    ENDIF.
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Verify target RFC destination
+*---------------------------------------------------------------------*
+  CLEAR lv_rfc_message.
+
+  CALL FUNCTION 'RFC_PING'
+    DESTINATION p_trfc
+    EXCEPTIONS
+      system_failure        = 1 MESSAGE lv_rfc_message
+      communication_failure = 2 MESSAGE lv_rfc_message
+      OTHERS                = 3.
+
+  IF sy-subrc <> 0.
+    IF lv_rfc_message IS INITIAL.
+      MESSAGE |Target RFC destination { p_trfc } is not reachable|
+        TYPE 'E'.
+    ELSE.
+      MESSAGE |Target RFC { p_trfc }: { lv_rfc_message }|
+        TYPE 'E'.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+
+
+
+*---------------------------------------------------------------------*
+* Read the source layout catalogue
+*---------------------------------------------------------------------*
+FORM get_layout_data.
+
+  DATA:
+    lt_report  TYPE zcl_alvlayoutmgr=>ty_report_range,
+    lt_variant TYPE zcl_alvlayoutmgr=>ty_variant_range,
+    lv_success TYPE abap_bool,
+    lv_message TYPE bapi_msg.
+
+  CLEAR:
+    gt_alv1,
+    gt_alv2,
+    gt_alv3,
+    lv_success,
+    lv_message.
+
+  lt_report[]  = s_report[].
+  lt_variant[] = s_var[].
+
+  IF go_layout_mgr IS NOT BOUND.
+    PERFORM class_objects.
+  ENDIF.
+
+  " ALV1: Read layouts from the RFC source system
+  go_layout_mgr->get_source_layouts(
+    EXPORTING
+      iv_rfcdst = p_srfc
+      ir_report = lt_report
+      ir_var    = lt_variant
+      iv_user   = p_user
+    IMPORTING
+      et_layouts = gt_alv1
+      ev_success = lv_success
+      ev_message = lv_message ).
+
+  IF lv_success = abap_false.
+    MESSAGE lv_message TYPE 'E'.
+  ENDIF.
+
+  " ALV2: Read current layouts from the local target system
+  CLEAR: lv_success, lv_message.
+
+  go_layout_mgr->get_target_layouts(
+    EXPORTING
+      iv_rfcdst = p_trfc
+      ir_report = lt_report
+      ir_var    = lt_variant
+      iv_user   = p_user
+    IMPORTING
+      et_layouts = gt_alv2
+      ev_success = lv_success
+      ev_message = lv_message ).
+
+  IF lv_success = abap_false.
+    MESSAGE lv_message TYPE 'E'.
+  ENDIF.
+
+  " ALV3: Build the source-to-target catalogue comparison
+  CLEAR: lv_success, lv_message.
+
+  go_layout_mgr->compare_layouts(
+    EXPORTING
+      iv_source_rfcdst = p_srfc
+      iv_target_rfcdst = p_trfc
+      it_source        = gt_alv1
+      it_target        = gt_alv2
+    IMPORTING
+      et_comparison    = gt_alv3
+      ev_success       = lv_success
+      ev_message       = lv_message ).
+
+  gv_success = lv_success.
+  gv_message = lv_message.
+
+  IF lv_success = abap_false.
+    MESSAGE lv_message TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Build the field catalogue for the main ALV
+*---------------------------------------------------------------------*
+FORM build_fieldcat_alv1.
+
+  FIELD-SYMBOLS:
+    <ls_fieldcat> TYPE lvc_s_fcat.
+
+  CLEAR gt_fieldcat1.
+
+  CALL METHOD zcl_tralv=>get_itab_fieldcat
+    EXPORTING
+      iv_itab     = gt_alv1
+    IMPORTING
+      et_fieldcat = gt_fieldcat1.
+
+  LOOP AT gt_fieldcat1 ASSIGNING <ls_fieldcat>.
+
+    CASE <ls_fieldcat>-fieldname.
+
+      WHEN 'COUNTER'.
+
+        <ls_fieldcat>-col_pos   = 1.
+        <ls_fieldcat>-outputlen = 8.
+        <ls_fieldcat>-reptext   = '#'.
+        <ls_fieldcat>-scrtext_l = '#'.
+        <ls_fieldcat>-scrtext_m = '#'.
+        <ls_fieldcat>-scrtext_s = '#'.
+
+      WHEN 'SOURCE'.
+
+        <ls_fieldcat>-col_pos   = 2.
+        <ls_fieldcat>-outputlen = 15.
+        <ls_fieldcat>-reptext   = 'Source System'.
+        <ls_fieldcat>-scrtext_l = 'Source System'.
+        <ls_fieldcat>-scrtext_m = 'Source'.
+        <ls_fieldcat>-scrtext_s = 'Source'.
+      WHEN 'SEL'.
+        <ls_fieldcat>-no_out = abap_true.
+        <ls_fieldcat>-tech   = abap_true.
+
+
+      WHEN 'REPORT'.
+
+        <ls_fieldcat>-col_pos   = 4.
+        <ls_fieldcat>-outputlen = 40.
+        <ls_fieldcat>-reptext   = 'Report'.
+        <ls_fieldcat>-scrtext_l = 'Report'.
+        <ls_fieldcat>-scrtext_m = 'Report'.
+        <ls_fieldcat>-scrtext_s = 'Report'.
+
+      WHEN 'VARIANT'.
+
+        <ls_fieldcat>-col_pos   = 5.
+        <ls_fieldcat>-outputlen = 15.
+        <ls_fieldcat>-reptext   = 'Layout'.
+        <ls_fieldcat>-scrtext_l = 'Layout'.
+        <ls_fieldcat>-scrtext_m = 'Layout'.
+        <ls_fieldcat>-scrtext_s = 'Layout'.
+
+      WHEN 'TEXT'.
+
+        <ls_fieldcat>-col_pos   = 6.
+        <ls_fieldcat>-outputlen = 40.
+        <ls_fieldcat>-reptext   = 'Description'.
+        <ls_fieldcat>-scrtext_l = 'Description'.
+        <ls_fieldcat>-scrtext_m = 'Description'.
+        <ls_fieldcat>-scrtext_s = 'Description'.
+
+      WHEN 'USERNAME'.
+
+        <ls_fieldcat>-col_pos   = 7.
+        <ls_fieldcat>-outputlen = 12.
+        <ls_fieldcat>-reptext   = 'Owner'.
+        <ls_fieldcat>-scrtext_l = 'Owner'.
+        <ls_fieldcat>-scrtext_m = 'Owner'.
+        <ls_fieldcat>-scrtext_s = 'Owner'.
+
+      WHEN 'HANDLE'.
+
+        <ls_fieldcat>-col_pos   = 8.
+        <ls_fieldcat>-outputlen = 10.
+        <ls_fieldcat>-reptext   = 'Handle'.
+        <ls_fieldcat>-scrtext_l = 'Handle'.
+        <ls_fieldcat>-scrtext_m = 'Handle'.
+        <ls_fieldcat>-scrtext_s = 'Handle'.
+
+      WHEN 'LOG_GROUP'.
+
+        <ls_fieldcat>-col_pos   = 9.
+        <ls_fieldcat>-outputlen = 15.
+        <ls_fieldcat>-reptext   = 'Logical Group'.
+        <ls_fieldcat>-scrtext_l = 'Logical Group'.
+        <ls_fieldcat>-scrtext_m = 'Logical Group'.
+        <ls_fieldcat>-scrtext_s = 'Log. Group'.
+
+      WHEN 'TYPE'.
+
+        <ls_fieldcat>-col_pos   = 10.
+        <ls_fieldcat>-outputlen = 6.
+        <ls_fieldcat>-reptext   = 'Type'.
+        <ls_fieldcat>-scrtext_l = 'Type'.
+        <ls_fieldcat>-scrtext_m = 'Type'.
+        <ls_fieldcat>-scrtext_s = 'Type'.
+
+      WHEN 'STATUS'.
+
+        <ls_fieldcat>-col_pos   = 11.
+        <ls_fieldcat>-outputlen = 12.
+        <ls_fieldcat>-reptext   = 'Status'.
+        <ls_fieldcat>-scrtext_l = 'Status'.
+        <ls_fieldcat>-scrtext_m = 'Status'.
+        <ls_fieldcat>-scrtext_s = 'Status'.
+
+      WHEN 'MESSAGE'.
+
+        <ls_fieldcat>-col_pos   = 12.
+        <ls_fieldcat>-outputlen = 60.
+        <ls_fieldcat>-reptext   = 'Result'.
+        <ls_fieldcat>-scrtext_l = 'Result'.
+        <ls_fieldcat>-scrtext_m = 'Result'.
+        <ls_fieldcat>-scrtext_s = 'Result'.
+
+    ENDCASE.
+
+  ENDLOOP.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Build the field catalogue for ALV2 - Target layouts
+*---------------------------------------------------------------------*
+FORM build_fieldcat_alv2.
+
+  FIELD-SYMBOLS <ls_fieldcat> TYPE lvc_s_fcat.
+
+  CLEAR gt_fieldcat2.
+
+  CALL METHOD zcl_tralv=>get_itab_fieldcat
+    EXPORTING
+      iv_itab     = gt_alv2
+    IMPORTING
+      et_fieldcat = gt_fieldcat2.
+
+  LOOP AT gt_fieldcat2 ASSIGNING <ls_fieldcat>.
+    CASE <ls_fieldcat>-fieldname.
+      WHEN 'COUNTER'.
+        <ls_fieldcat>-col_pos = 1.
+        <ls_fieldcat>-reptext = '#'.
+      WHEN 'TARGET'.
+        <ls_fieldcat>-col_pos = 2.
+        <ls_fieldcat>-reptext = 'Target System'.
+      WHEN 'SEL'.
+        <ls_fieldcat>-no_out = abap_true.
+        <ls_fieldcat>-tech   = abap_true.
+
+      WHEN 'REPORT'.
+        <ls_fieldcat>-col_pos = 4.
+        <ls_fieldcat>-reptext = 'Report'.
+      WHEN 'VARIANT'.
+        <ls_fieldcat>-col_pos = 5.
+        <ls_fieldcat>-reptext = 'Layout'.
+      WHEN 'TEXT'.
+        <ls_fieldcat>-col_pos = 6.
+        <ls_fieldcat>-reptext = 'Description'.
+      WHEN 'USERNAME'.
+        <ls_fieldcat>-col_pos = 7.
+        <ls_fieldcat>-reptext = 'Owner'.
+      WHEN 'HANDLE'.
+        <ls_fieldcat>-col_pos = 8.
+      WHEN 'LOG_GROUP'.
+        <ls_fieldcat>-col_pos = 9.
+      WHEN 'TYPE'.
+        <ls_fieldcat>-col_pos = 10.
+      WHEN 'EXISTS_LOCAL'.
+        <ls_fieldcat>-col_pos  = 11.
+        <ls_fieldcat>-checkbox = abap_true.
+        <ls_fieldcat>-reptext  = 'Exists'.
+      WHEN 'STATUS'.
+        <ls_fieldcat>-col_pos = 12.
+      WHEN 'MESSAGE'.
+        <ls_fieldcat>-col_pos = 13.
+        <ls_fieldcat>-outputlen = 60.
+    ENDCASE.
+  ENDLOOP.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Build the field catalogue for ALV3 - Comparison
+*---------------------------------------------------------------------*
+FORM build_fieldcat_alv3.
+
+  FIELD-SYMBOLS <ls_fieldcat> TYPE lvc_s_fcat.
+
+  CLEAR gt_fieldcat3.
+
+  CALL METHOD zcl_tralv=>get_itab_fieldcat
+    EXPORTING
+      iv_itab     = gt_alv3
+    IMPORTING
+      et_fieldcat = gt_fieldcat3.
+
+  LOOP AT gt_fieldcat3 ASSIGNING <ls_fieldcat>.
+    CASE <ls_fieldcat>-fieldname.
+      WHEN 'COUNTER'.
+        <ls_fieldcat>-col_pos = 1.
+        <ls_fieldcat>-reptext = '#'.
+      WHEN 'SOURCE'.
+        <ls_fieldcat>-col_pos = 2.
+      WHEN 'TARGET'.
+        <ls_fieldcat>-col_pos = 3.
+      WHEN 'REPORT'.
+        <ls_fieldcat>-col_pos = 4.
+      WHEN 'VARIANT'.
+        <ls_fieldcat>-col_pos = 5.
+        <ls_fieldcat>-reptext = 'Layout'.
+      WHEN 'USERNAME'.
+        <ls_fieldcat>-col_pos = 6.
+        <ls_fieldcat>-reptext = 'Owner'.
+      WHEN 'SOURCE_EXISTS'.
+        <ls_fieldcat>-col_pos  = 7.
+        <ls_fieldcat>-checkbox = abap_true.
+        <ls_fieldcat>-reptext  = 'Source Exists'.
+      WHEN 'TARGET_EXISTS'.
+        <ls_fieldcat>-col_pos  = 8.
+        <ls_fieldcat>-checkbox = abap_true.
+        <ls_fieldcat>-reptext  = 'Target Exists'.
+      WHEN 'SOURCE_TEXT'.
+        <ls_fieldcat>-col_pos = 9.
+        <ls_fieldcat>-reptext = 'Source Description'.
+      WHEN 'TARGET_TEXT'.
+        <ls_fieldcat>-col_pos = 10.
+        <ls_fieldcat>-reptext = 'Target Description'.
+      WHEN 'COMPARISON'.
+        <ls_fieldcat>-col_pos = 11.
+      WHEN 'MESSAGE'.
+        <ls_fieldcat>-col_pos = 12.
+        <ls_fieldcat>-outputlen = 60.
+      WHEN 'SEL'.
+        <ls_fieldcat>-no_out = abap_true.
+      WHEN 'HANDLE' OR 'LOG_GROUP' OR 'TYPE'.
+        <ls_fieldcat>-tech = abap_true.
+    ENDCASE.
+  ENDLOOP.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Build data used by the selector tree
+*---------------------------------------------------------------------*
+FORM alv_tree_data.
+
+  DATA:
+    lt_tree_fieldcat TYPE lvc_t_fcat,
+    ls_fieldcat      TYPE lvc_s_fcat,
+    ls_layout        TYPE zcl_alvlayoutmgr=>ty_alv1data.
+
+  CLEAR: gt_fieldcat1t, gt_sort_tree.
+
+  IF <gt_alvtree1> IS ASSIGNED.
+    UNASSIGN: <gt_alvtree1>, <gs_alvtree1>.
+  ENDIF.
+
+  CLEAR: gr_tree_table, gr_tree_line.
+
+  lt_tree_fieldcat = gt_fieldcat1.
+
+  DELETE lt_tree_fieldcat
+    WHERE fieldname <> 'SOURCE'
+      AND fieldname <> 'REPORT'
+      AND fieldname <> 'USERNAME'
+      AND fieldname <> 'VARIANT'.
+
+  LOOP AT lt_tree_fieldcat INTO ls_fieldcat.
+    CASE ls_fieldcat-fieldname.
+      WHEN 'SOURCE'.
+        ls_fieldcat-col_pos = 1.
+      WHEN 'REPORT'.
+        ls_fieldcat-col_pos = 2.
+      WHEN 'USERNAME'.
+        ls_fieldcat-col_pos = 3.
+      WHEN 'VARIANT'.
+        ls_fieldcat-col_pos = 4.
+    ENDCASE.
+    MODIFY lt_tree_fieldcat FROM ls_fieldcat.
+  ENDLOOP.
+
+  gt_fieldcat1t = lt_tree_fieldcat.
+
+  CALL METHOD cl_alv_table_create=>create_dynamic_table
+    EXPORTING
+      it_fieldcatalog           = gt_fieldcat1t
+    IMPORTING
+      ep_table                  = gr_tree_table
+    EXCEPTIONS
+      generate_subpool_dir_full = 1
+      OTHERS                    = 2.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not create selector tree data' TYPE 'E'.
+  ENDIF.
+
+  ASSIGN gr_tree_table->* TO <gt_alvtree1>.
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not assign selector tree table' TYPE 'E'.
+  ENDIF.
+
+  CREATE DATA gr_tree_line LIKE LINE OF <gt_alvtree1>.
+  ASSIGN gr_tree_line->* TO <gs_alvtree1>.
+  IF sy-subrc <> 0.
+    MESSAGE 'Could not assign selector tree row' TYPE 'E'.
+  ENDIF.
+
+  LOOP AT gt_alv1 INTO ls_layout.
+    CLEAR <gs_alvtree1>.
+    MOVE-CORRESPONDING ls_layout TO <gs_alvtree1>.
+    APPEND <gs_alvtree1> TO <gt_alvtree1>.
+  ENDLOOP.
+
+  SORT <gt_alvtree1>.
+  DELETE ADJACENT DUPLICATES FROM <gt_alvtree1>.
+
+  PERFORM build_sort_table_tree.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Define the hierarchy of the selector tree
+*---------------------------------------------------------------------*
+FORM build_sort_table_tree.
+
+  DATA ls_sort TYPE lvc_s_sort.
+
+  CLEAR gt_sort_tree.
+
+  CLEAR ls_sort.
+  ls_sort-spos      = 1.
+  ls_sort-fieldname = 'SOURCE'.
+  ls_sort-up        = abap_true.
+  APPEND ls_sort TO gt_sort_tree.
+
+  CLEAR ls_sort.
+  ls_sort-spos      = 2.
+  ls_sort-fieldname = 'REPORT'.
+  ls_sort-up        = abap_true.
+  APPEND ls_sort TO gt_sort_tree.
+
+  CLEAR ls_sort.
+  ls_sort-spos      = 3.
+  ls_sort-fieldname = 'USERNAME'.
+  ls_sort-up        = abap_true.
+  APPEND ls_sort TO gt_sort_tree.
+
+  CLEAR ls_sort.
+  ls_sort-spos      = 4.
+  ls_sort-fieldname = 'VARIANT'.
+  ls_sort-up        = abap_true.
+  APPEND ls_sort TO gt_sort_tree.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Add custom buttons to the CL_GUI_ALV_GRID toolbar
+*---------------------------------------------------------------------*
+FORM modify_toolbar_alv1
+  TABLES
+    ct_toolbar TYPE STANDARD TABLE.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING space space space 3 space.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_import 'Import' icon_import 0
+          'Import selected layouts'.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_delete 'Delete' icon_delete 0
+          'Delete selected layouts from the target system'.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_refresh 'Refresh' icon_refresh 0
+          'Read the source layout catalogue again'.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_next 'Next' space 0
+          'Show target layouts'.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* ALV2 toolbar - Target layouts
+*---------------------------------------------------------------------*
+FORM modify_toolbar_alv2
+  TABLES ct_toolbar TYPE STANDARD TABLE.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+  USING gc_export
+        'Export'
+        icon_export
+        0
+        'Export selected layouts to source system'.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_delete 'Delete' icon_delete 0
+          'Delete selected target layouts'.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_refresh 'Refresh' icon_refresh 0
+          'Refresh source, target and comparison data'.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING space space space 3 space.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_prev 'Previous' space 0 'Show source layouts'.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_next 'Next' space 0 'Show comparison'.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* ALV3 toolbar - Comparison
+*---------------------------------------------------------------------*
+FORM modify_toolbar_alv3
+  TABLES ct_toolbar TYPE STANDARD TABLE.
+
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_refresh 'Refresh' icon_refresh 0
+          'Refresh source, target and comparison data'.
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING space space space 3 space.
+  PERFORM add_toolbar TABLES ct_toolbar
+    USING gc_prev 'Previous' space 0 'Show target layouts'.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Append one toolbar button
+*---------------------------------------------------------------------*
+FORM add_toolbar
+  TABLES
+    ct_toolbar TYPE STANDARD TABLE
+  USING
+    iv_function
+    iv_text
+    iv_icon
+    iv_button_type
+    iv_quickinfo.
+
+  DATA:
+    ls_toolbar TYPE stb_button.
+
+  CLEAR ls_toolbar.
+
+  ls_toolbar-function  = iv_function.
+  ls_toolbar-text      = iv_text.
+  ls_toolbar-icon      = iv_icon.
+  ls_toolbar-butn_type = iv_button_type.
+  ls_toolbar-quickinfo = iv_quickinfo.
+
+  APPEND ls_toolbar TO ct_toolbar.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Central command processing
+*---------------------------------------------------------------------*
+FORM user_command
+  USING iv_ucomm TYPE syucomm.
+
+  DATA lv_valid TYPE char1.
+
+  lv_valid = abap_true.
+
+  IF gv_current_page = gc_page_alv1 AND alv_grid1 IS BOUND.
+    alv_grid1->check_changed_data(
+      IMPORTING e_valid = lv_valid ).
+  ELSEIF gv_current_page = gc_page_alv2 AND alv_grid2 IS BOUND.
+    alv_grid2->check_changed_data(
+      IMPORTING e_valid = lv_valid ).
+  ENDIF.
+
+  IF lv_valid = abap_false.
+    MESSAGE 'Correct invalid ALV entries before continuing'
+      TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  CASE iv_ucomm.
+
+    WHEN gc_import.
+      IF gv_current_page = gc_page_alv1.
+        PERFORM import_selected_layouts.
+        PERFORM refresh_catalogs.
+      ENDIF.
+
+    WHEN gc_export.
+      IF gv_current_page = gc_page_alv2.
+        PERFORM export_selected_layouts.
+        PERFORM refresh_catalogs.
+      ENDIF.
+
+    WHEN gc_delete.
+      CASE gv_current_page.
+        WHEN gc_page_alv1.
+          PERFORM delete_selected_layouts.
+        WHEN gc_page_alv2.
+          PERFORM delete_selected_target_layouts.
+      ENDCASE.
+      PERFORM refresh_catalogs.
+
+    WHEN gc_refresh.
+      PERFORM refresh_catalogs.
+
+    WHEN gc_next.
+      PERFORM next_page.
+
+    WHEN gc_prev.
+      PERFORM previous_page.
+
+    WHEN gc_tree.
+      PERFORM toggle_tree.
+
+    WHEN OTHERS.
+
+  ENDCASE.
+
+  gv_stable_row   = abap_true.
+  gv_stable_col   = abap_true.
+  gv_refresh_grid = abap_true.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Select every layout row
+*---------------------------------------------------------------------*
+*---------------------------------------------------------------------*
+* Deselect every layout row
+*---------------------------------------------------------------------*
+*---------------------------------------------------------------------*
+* Count the currently selected rows
+*---------------------------------------------------------------------*
+*---------------------------------------------------------------------*
+* Get selected source rows from ALV1
+*---------------------------------------------------------------------*
+FORM get_selected_alv1_rows
+  CHANGING
+    ct_selected TYPE lvc_t_row.
+
+  CLEAR ct_selected.
+
+  IF alv_grid1 IS BOUND.
+    alv_grid1->get_selected_rows(
+      IMPORTING
+        et_index_rows = ct_selected ).
+  ENDIF.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Get selected target rows from ALV2
+*---------------------------------------------------------------------*
+FORM get_selected_alv2_rows
+  CHANGING
+    ct_selected TYPE lvc_t_row.
+
+  CLEAR ct_selected.
+
+  IF alv_grid2 IS BOUND.
+    alv_grid2->get_selected_rows(
+      IMPORTING
+        et_index_rows = ct_selected ).
+  ENDIF.
+
+ENDFORM.
+
+
+FORM count_selected_layouts
+  CHANGING
+    cv_count TYPE i.
+
+  DATA lt_selected TYPE lvc_t_row.
+
+  CLEAR cv_count.
+
+  PERFORM get_selected_alv1_rows
+    CHANGING lt_selected.
+
+  DESCRIBE TABLE lt_selected LINES cv_count.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Import selected layouts
+*---------------------------------------------------------------------*
+FORM import_selected_layouts.
+
+  DATA:
+    lt_selected TYPE lvc_t_row,
+    ls_selected TYPE lvc_s_row,
+    ls_result   TYPE zcl_alvlayoutmgr=>ty_alv1data,
+    lv_success  TYPE abap_bool,
+    lv_message  TYPE bapi_msg,
+    lv_answer   TYPE char1.
+
+  FIELD-SYMBOLS <ls_layout> TYPE zcl_alvlayoutmgr=>ty_alv1data.
+
+  PERFORM get_selected_alv1_rows
+    CHANGING lt_selected.
+
+  IF lt_selected IS INITIAL.
+    MESSAGE 'Select at least one source layout'
+      TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  IF p_test = abap_true.
+    MESSAGE 'Test mode is active; clear Test Mode before importing'
+      TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  CALL FUNCTION 'POPUP_TO_CONFIRM'
+    EXPORTING
+      titlebar              = 'Import ALV layouts'
+      text_question         =
+                              'Import selected source layouts into the target RFC system?'
+      text_button_1         = 'Import'
+      text_button_2         = 'Cancel'
+      default_button        = '2'
+      display_cancel_button = space
+    IMPORTING
+      answer                = lv_answer
+    EXCEPTIONS
+      text_not_found        = 1
+      OTHERS                = 2.
+
+  IF sy-subrc <> 0 OR lv_answer <> '1'.
+    RETURN.
+  ENDIF.
+
+  LOOP AT lt_selected INTO ls_selected.
+
+    READ TABLE gt_alv1 ASSIGNING <ls_layout>
+      INDEX ls_selected-index.
+    CHECK sy-subrc = 0.
+
+    CLEAR: ls_result, lv_success, lv_message.
+
+    go_layout_mgr->import_layout(
+      EXPORTING
+        iv_source_rfcdst = p_srfc
+        iv_target_rfcdst = p_trfc
+        is_layout        = <ls_layout>
+        iv_targetuser    = p_tuser
+        iv_global        = p_glob
+        iv_overwrite     = p_ovrw
+      IMPORTING
+        es_layout        = ls_result
+        ev_success       = lv_success
+        ev_message       = lv_message ).
+
+    <ls_layout>-status  = ls_result-status.
+    <ls_layout>-message = lv_message.
+
+  ENDLOOP.
+
+  gv_refresh_alv1 = abap_true.
+  gv_refresh_alv2 = abap_true.
+  gv_refresh_alv3 = abap_true.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Export selected layouts from target RFC to source RFC
+*---------------------------------------------------------------------*
+FORM export_selected_layouts.
+
+  DATA:
+    lt_selected TYPE lvc_t_row,
+    ls_selected TYPE lvc_s_row,
+    ls_result   TYPE zcl_alvlayoutmgr=>ty_alv2data,
+    lv_success  TYPE abap_bool,
+    lv_message  TYPE bapi_msg,
+    lv_answer   TYPE char1.
+
+  FIELD-SYMBOLS <ls_alv2> TYPE zcl_alvlayoutmgr=>ty_alv2data.
+
+  PERFORM get_selected_alv2_rows
+    CHANGING lt_selected.
+
+  IF lt_selected IS INITIAL.
+    MESSAGE 'Select at least one target layout'
+      TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  CALL FUNCTION 'POPUP_TO_CONFIRM'
+    EXPORTING
+      titlebar              = 'Export ALV layouts'
+      text_question         =
+                              'Export selected target layouts into the source RFC system?'
+      text_button_1         = 'Export'
+      text_button_2         = 'Cancel'
+      default_button        = '2'
+      display_cancel_button = space
+    IMPORTING
+      answer                = lv_answer
+    EXCEPTIONS
+      text_not_found        = 1
+      OTHERS                = 2.
+
+  IF sy-subrc <> 0 OR lv_answer <> '1'.
+    RETURN.
+  ENDIF.
+
+  LOOP AT lt_selected INTO ls_selected.
+
+    READ TABLE gt_alv2 ASSIGNING <ls_alv2>
+      INDEX ls_selected-index.
+    CHECK sy-subrc = 0.
+
+    CLEAR: ls_result, lv_success, lv_message.
+
+    go_layout_mgr->export_layout(
+      EXPORTING
+        iv_source_rfcdst = p_srfc
+        iv_target_rfcdst = p_trfc
+        is_layout        = <ls_alv2>
+        iv_targetuser    = p_tuser
+        iv_global        = p_glob
+        iv_overwrite     = p_ovrw
+      IMPORTING
+        es_layout        = ls_result
+        ev_success       = lv_success
+        ev_message       = lv_message ).
+
+    <ls_alv2>-status  = ls_result-status.
+    <ls_alv2>-message = lv_message.
+
+  ENDLOOP.
+
+  gv_refresh_alv1 = abap_true.
+  gv_refresh_alv2 = abap_true.
+  gv_refresh_alv3 = abap_true.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Delete selected layouts from the local target system
+*---------------------------------------------------------------------*
+FORM delete_selected_layouts.
+
+  DATA:
+    lt_selected TYPE lvc_t_row,
+    ls_selected TYPE lvc_s_row,
+    ls_result   TYPE zcl_alvlayoutmgr=>ty_alv1data,
+    lv_success  TYPE abap_bool,
+    lv_message  TYPE bapi_msg,
+    lv_answer   TYPE char1.
+
+  FIELD-SYMBOLS <ls_layout> TYPE zcl_alvlayoutmgr=>ty_alv1data.
+
+  PERFORM get_selected_alv1_rows
+    CHANGING lt_selected.
+
+  IF lt_selected IS INITIAL.
+    MESSAGE 'Select at least one layout'
+      TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  CALL FUNCTION 'POPUP_TO_CONFIRM'
+    EXPORTING
+      titlebar              = 'Delete target ALV layouts'
+      text_question         =
+                              'Delete the selected layouts from the target system?'
+      text_button_1         = 'Delete'
+      text_button_2         = 'Cancel'
+      default_button        = '2'
+      display_cancel_button = space
+    IMPORTING
+      answer                = lv_answer
+    EXCEPTIONS
+      text_not_found        = 1
+      OTHERS                = 2.
+
+  IF sy-subrc <> 0 OR lv_answer <> '1'.
+    RETURN.
+  ENDIF.
+
+  LOOP AT lt_selected INTO ls_selected.
+    READ TABLE gt_alv1 ASSIGNING <ls_layout>
+      INDEX ls_selected-index.
+    CHECK sy-subrc = 0.
+
+    CLEAR: ls_result, lv_success, lv_message.
+
+    go_layout_mgr->delete_layout(
+      EXPORTING
+        iv_rfcdst    = <ls_layout>-source
+        is_layout     = <ls_layout>
+        iv_targetuser = p_tuser
+        iv_global     = p_glob
+      IMPORTING
+        es_layout     = ls_result
+        ev_success    = lv_success
+        ev_message    = lv_message ).
+
+    <ls_layout>-status  = ls_result-status.
+    <ls_layout>-message = lv_message.
+  ENDLOOP.
+
+  gv_refresh_alv1 = abap_true.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Refresh the main ALV
+*---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+* Delete selected rows directly from ALV2
+*---------------------------------------------------------------------*
+FORM delete_selected_target_layouts.
+
+  DATA:
+    lt_selected TYPE lvc_t_row,
+    ls_selected TYPE lvc_s_row,
+    ls_layout   TYPE zcl_alvlayoutmgr=>ty_layout,
+    ls_result   TYPE zcl_alvlayoutmgr=>ty_layout,
+    lv_success  TYPE abap_bool,
+    lv_message  TYPE bapi_msg,
+    lv_answer   TYPE char1.
+
+  FIELD-SYMBOLS:
+    <ls_alv2> TYPE zcl_alvlayoutmgr=>ty_alv2data.
+
+*---------------------------------------------------------------------*
+* Determine selected rows
+*---------------------------------------------------------------------*
+  PERFORM get_selected_alv2_rows
+    CHANGING lt_selected.
+
+  IF lt_selected IS INITIAL.
+
+    MESSAGE
+      'Select at least one target layout'
+      TYPE 'S'
+      DISPLAY LIKE 'E'.
+
+    RETURN.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Confirmation
+*---------------------------------------------------------------------*
+  CALL FUNCTION 'POPUP_TO_CONFIRM'
+    EXPORTING
+      titlebar              = 'Delete Target Layouts'
+      text_question         =
+        'Delete selected layouts in the target RFC system?'
+      text_button_1         = 'Delete'
+      text_button_2         = 'Cancel'
+      default_button        = '2'
+      display_cancel_button = space
+    IMPORTING
+      answer                = lv_answer
+    EXCEPTIONS
+      text_not_found        = 1
+      OTHERS                = 2.
+
+  IF sy-subrc <> 0
+     OR lv_answer <> '1'.
+
+    RETURN.
+
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* Delete layouts in target RFC
+*---------------------------------------------------------------------*
+  LOOP AT lt_selected INTO ls_selected.
+
+    READ TABLE gt_alv2
+      ASSIGNING <ls_alv2>
+      INDEX ls_selected-index.
+
+    CHECK sy-subrc = 0.
+
+    CLEAR:
+      ls_layout,
+      ls_result,
+      lv_success,
+      lv_message.
+
+*---------------------------------------------------------------------*
+* Convert ALV2 structure into generic layout structure
+*---------------------------------------------------------------------*
+    MOVE-CORRESPONDING <ls_alv2>
+      TO ls_layout.
+
+*---------------------------------------------------------------------*
+* Tell DELETE_LAYOUT which RFC owns the layout
+*---------------------------------------------------------------------*
+    ls_layout-source = p_trfc.
+
+*---------------------------------------------------------------------*
+* Delete remotely via ZZ_LAYOUT_DELETE_RFC
+*---------------------------------------------------------------------*
+    go_layout_mgr->delete_layout(
+      EXPORTING
+        iv_rfcdst  = p_trfc
+        is_layout  = ls_layout
+      IMPORTING
+        es_layout  = ls_result
+        ev_success = lv_success
+        ev_message = lv_message ).
+
+*---------------------------------------------------------------------*
+* Update ALV2 status
+*---------------------------------------------------------------------*
+    <ls_alv2>-status  = ls_result-status.
+    <ls_alv2>-message = lv_message.
+
+  ENDLOOP.
+
+*---------------------------------------------------------------------*
+* Refresh all ALVs
+*---------------------------------------------------------------------*
+  gv_refresh_alv1 = abap_true.
+  gv_refresh_alv2 = abap_true.
+  gv_refresh_alv3 = abap_true.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Reload target layouts and rebuild comparison after target changes
+*---------------------------------------------------------------------*
+*---------------------------------------------------------------------*
+* Reload both RFC catalogues and refresh all ALV pages
+*---------------------------------------------------------------------*
+FORM refresh_catalogs.
+
+  PERFORM get_layout_data.
+  PERFORM build_fieldcat_alv1.
+  PERFORM build_fieldcat_alv2.
+  PERFORM build_fieldcat_alv3.
+  PERFORM alv_tree_data.
+
+  gv_stable_row  = abap_true.
+  gv_stable_col  = abap_true.
+  gv_refresh_data = abap_true.
+  gv_refresh_alv1 = abap_true.
+  gv_refresh_alv2 = abap_true.
+  gv_refresh_alv3 = abap_true.
+
+  PERFORM refresh_alv_report
+    USING gv_stable_row
+          gv_stable_col.
+
+  cl_gui_cfw=>flush( ).
+
+ENDFORM.
+
+
+FORM reload_target_and_comparison.
+
+  DATA:
+    lt_report  TYPE zcl_alvlayoutmgr=>ty_report_range,
+    lt_variant TYPE zcl_alvlayoutmgr=>ty_variant_range,
+    lv_success TYPE abap_bool,
+    lv_message TYPE bapi_msg.
+
+  lt_report[]  = s_report[].
+  lt_variant[] = s_var[].
+
+  go_layout_mgr->get_target_layouts(
+    EXPORTING
+      iv_rfcdst = p_trfc
+      ir_report = lt_report
+      ir_var    = lt_variant
+      iv_user   = p_user
+    IMPORTING
+      et_layouts = gt_alv2
+      ev_success = lv_success
+      ev_message = lv_message ).
+
+  IF lv_success = abap_false.
+    MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  CLEAR: lv_success, lv_message.
+
+  go_layout_mgr->compare_layouts(
+    EXPORTING
+      iv_source_rfcdst = p_srfc
+      iv_target_rfcdst = p_trfc
+      it_source        = gt_alv1
+      it_target        = gt_alv2
+    IMPORTING
+      et_comparison    = gt_alv3
+      ev_success       = lv_success
+      ev_message       = lv_message ).
+
+  IF lv_success = abap_false.
+    MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
+  gv_refresh_data = abap_true.
+  gv_refresh_alv1 = abap_true.
+  gv_refresh_alv2 = abap_true.
+  gv_refresh_alv3 = abap_true.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Navigate to the next ALV page
+*---------------------------------------------------------------------*
+FORM next_page.
+
+  ADD 1 TO gv_current_page.
+  IF gv_current_page > gc_page_alv3.
+    gv_current_page = gc_page_alv1.
+  ENDIF.
+
+  PERFORM show_current_page.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Navigate to the previous ALV page
+*---------------------------------------------------------------------*
+FORM previous_page.
+
+  SUBTRACT 1 FROM gv_current_page.
+  IF gv_current_page < gc_page_alv1.
+    gv_current_page = gc_page_alv3.
+  ENDIF.
+
+  PERFORM show_current_page.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Display only the selected ALV page; keep the tree visible
+*---------------------------------------------------------------------*
+FORM show_current_page.
+
+  IF top_container1 IS NOT BOUND
+     OR top_container2 IS NOT BOUND
+     OR top_container3 IS NOT BOUND.
+    RETURN.
+  ENDIF.
+
+  CASE gv_current_page.
+    WHEN gc_page_alv1.
+      top_container1->set_visible( visible = abap_true ).
+      top_container2->set_visible( visible = abap_false ).
+      top_container3->set_visible( visible = abap_false ).
+      gv_visible_alv1 = abap_true.
+      CLEAR: gv_visible_alv2, gv_visible_alv3.
+    WHEN gc_page_alv2.
+      top_container1->set_visible( visible = abap_false ).
+      top_container2->set_visible( visible = abap_true ).
+      top_container3->set_visible( visible = abap_false ).
+      gv_visible_alv2 = abap_true.
+      CLEAR: gv_visible_alv1, gv_visible_alv3.
+    WHEN gc_page_alv3.
+      top_container1->set_visible( visible = abap_false ).
+      top_container2->set_visible( visible = abap_false ).
+      top_container3->set_visible( visible = abap_true ).
+      gv_visible_alv3 = abap_true.
+      CLEAR: gv_visible_alv1, gv_visible_alv2.
+  ENDCASE.
+
+  cl_gui_cfw=>flush( ).
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+* Toggle Tree Visibility
+*---------------------------------------------------------------------*
+FORM toggle_tree.
+
+  IF left_container1 IS NOT BOUND.
+    RETURN.
+  ENDIF.
+
+  IF gv_visible_tree = abap_true.
+
+    CALL METHOD left_container1->set_visible
+      EXPORTING
+        visible = abap_false.
+
+    gv_visible_tree = abap_false.
+
+  ELSE.
+
+    CALL METHOD left_container1->set_visible
+      EXPORTING
+        visible = abap_true.
+
+    gv_visible_tree = abap_true.
+
+  ENDIF.
+
+  CALL METHOD cl_gui_cfw=>flush.
+
+ENDFORM.
+
+
+FORM refresh_alv_report
+  USING
+    iv_stable_row TYPE char1
+    iv_stable_col TYPE char1.
+
+  DATA ls_stable TYPE lvc_s_stbl.
+
+  ls_stable-row = iv_stable_row.
+  ls_stable-col = iv_stable_col.
+
+  IF alv_grid1 IS BOUND AND gv_refresh_alv1 = abap_true.
+    IF gv_refresh_data = abap_true.
+      alv_grid1->set_frontend_fieldcatalog(
+        it_fieldcatalog = gt_fieldcat1 ).
+    ENDIF.
+    alv_grid1->refresh_table_display(
+      EXPORTING is_stable = ls_stable ).
+    gv_refresh_alv1 = abap_false.
+  ENDIF.
+
+  IF alv_grid2 IS BOUND AND gv_refresh_alv2 = abap_true.
+    IF gv_refresh_data = abap_true.
+      alv_grid2->set_frontend_fieldcatalog(
+        it_fieldcatalog = gt_fieldcat2 ).
+    ENDIF.
+    alv_grid2->refresh_table_display(
+      EXPORTING is_stable = ls_stable ).
+    gv_refresh_alv2 = abap_false.
+  ENDIF.
+
+  IF alv_grid3 IS BOUND AND gv_refresh_alv3 = abap_true.
+    IF gv_refresh_data = abap_true.
+      alv_grid3->set_frontend_fieldcatalog(
+        it_fieldcatalog = gt_fieldcat3 ).
+    ENDIF.
+    alv_grid3->refresh_table_display(
+      EXPORTING is_stable = ls_stable ).
+    gv_refresh_alv3 = abap_false.
+  ENDIF.
+
+  gv_refresh_data = abap_false.
+
+ENDFORM.
+
+
+*---------------------------------------------------------------------*
+* Open the cockpit screen
+*---------------------------------------------------------------------*
+FORM alv_object_screen.
+
+  gv_repid = sy-repid.
+
+  CALL SCREEN 9900.
+
+ENDFORM.
