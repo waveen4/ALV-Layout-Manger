@@ -1,0 +1,292 @@
+*&---------------------------------------------------------------------*
+*& Include          ZZALVLAYOUTIMPORT_DAT
+*&---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+* Application command constants
+*---------------------------------------------------------------------*
+CONSTANTS:
+  gc_import  TYPE syucomm VALUE 'IMPORT',
+  gc_export  TYPE syucomm VALUE 'EXPORT',
+  gc_delete  TYPE syucomm VALUE 'DELETE',
+  gc_selall  TYPE syucomm VALUE 'SELALL',
+  gc_desel   TYPE syucomm VALUE 'DESEL',
+  gc_refresh TYPE syucomm VALUE 'REFR',
+  gc_next    TYPE syucomm VALUE 'NEXT',
+  gc_prev    TYPE syucomm VALUE 'PREV',
+  gc_tree    TYPE syucomm VALUE 'TREE'.
+
+*---------------------------------------------------------------------*
+* ALV page constants
+*---------------------------------------------------------------------*
+CONSTANTS:
+  gc_page_alv1 TYPE i VALUE 1,
+  gc_page_alv2 TYPE i VALUE 2,
+  gc_page_alv3 TYPE i VALUE 3.
+
+*---------------------------------------------------------------------*
+* Global runtime variables
+*---------------------------------------------------------------------*
+DATA:
+  gv_repid TYPE sy-repid.
+
+*---------------------------------------------------------------------*
+* Business class
+*---------------------------------------------------------------------*
+DATA:
+  go_layout_mgr TYPE REF TO zcl_alvlayoutmgr.
+
+*---------------------------------------------------------------------*
+* Current tree filter context
+*---------------------------------------------------------------------*
+* The tree sets this structure. All three ALVs are then filtered using
+* the same context.
+*---------------------------------------------------------------------*
+DATA:
+  gs_context TYPE zcl_alvlayoutmgr=>ty_context.
+
+*---------------------------------------------------------------------*
+* ALV1 - Source-system layouts
+*---------------------------------------------------------------------*
+DATA:
+  gt_alv1 TYPE zcl_alvlayoutmgr=>tt_alv1data,
+  gs_alv1 TYPE zcl_alvlayoutmgr=>ty_alv1data.
+
+*---------------------------------------------------------------------*
+* ALV2 - Current layouts in the local target system
+*---------------------------------------------------------------------*
+DATA:
+  gt_alv2 TYPE zcl_alvlayoutmgr=>tt_alv2data,
+  gs_alv2 TYPE zcl_alvlayoutmgr=>ty_alv2data.
+
+*---------------------------------------------------------------------*
+* ALV3 - Source-to-target comparison
+*---------------------------------------------------------------------*
+DATA:
+  gt_alv3 TYPE zcl_alvlayoutmgr=>tt_alv3data,
+  gs_alv3 TYPE zcl_alvlayoutmgr=>ty_alv3data.
+
+*---------------------------------------------------------------------*
+* Compatibility data
+*---------------------------------------------------------------------*
+* Keep these declarations temporarily while F01, CLI and O01 are moved
+* from the original single-ALV implementation to GT_ALV1.
+*
+* Remove these declarations after all references to GT_LAYOUTS and
+* GS_LAYOUT have been replaced.
+*---------------------------------------------------------------------*
+DATA:
+  gt_layouts TYPE zcl_alvlayoutmgr=>tt_layout,
+  gs_layout  TYPE zcl_alvlayoutmgr=>ty_layout.
+
+*---------------------------------------------------------------------*
+* ALV page navigation
+*---------------------------------------------------------------------*
+* The tree remains visible. PREV and NEXT change which ALV page is
+* visible in the main cockpit area.
+*---------------------------------------------------------------------*
+DATA:
+  gv_current_page TYPE i VALUE gc_page_alv1.
+
+*---------------------------------------------------------------------*
+* ALV selector tree
+*---------------------------------------------------------------------*
+DATA:
+  alv_tree1    TYPE REF TO cl_gui_alv_tree_simple,
+  gt_sort_tree TYPE lvc_t_sort.
+
+*---------------------------------------------------------------------*
+* ALV grids
+*---------------------------------------------------------------------*
+DATA:
+  alv_grid1 TYPE REF TO cl_gui_alv_grid,
+  alv_grid2 TYPE REF TO cl_gui_alv_grid,
+  alv_grid3 TYPE REF TO cl_gui_alv_grid.
+
+*---------------------------------------------------------------------*
+* Docking containers
+*---------------------------------------------------------------------*
+DATA:
+  left_container1 TYPE REF TO cl_gui_docking_container,
+  top_container1  TYPE REF TO cl_gui_docking_container,
+  top_container2  TYPE REF TO cl_gui_docking_container,
+  top_container3  TYPE REF TO cl_gui_docking_container.
+
+*---------------------------------------------------------------------*
+* Tree field catalogue
+*---------------------------------------------------------------------*
+DATA:
+  gt_fieldcat1t TYPE lvc_t_fcat.
+
+*---------------------------------------------------------------------*
+* ALV field catalogues
+*---------------------------------------------------------------------*
+DATA:
+  gt_fieldcat1 TYPE lvc_t_fcat,
+  gt_fieldcat2 TYPE lvc_t_fcat,
+  gt_fieldcat3 TYPE lvc_t_fcat.
+
+*---------------------------------------------------------------------*
+* ALV display layouts
+*---------------------------------------------------------------------*
+DATA:
+  gs_alv_layout1 TYPE lvc_s_layo,
+  gs_alv_layout2 TYPE lvc_s_layo,
+  gs_alv_layout3 TYPE lvc_s_layo.
+
+*---------------------------------------------------------------------*
+* Compatibility ALV layout
+*---------------------------------------------------------------------*
+* The current O01 uses GS_ALV_LAYOUT. Keep it until BUILD_ALV1 is
+* changed to use GS_ALV_LAYOUT1.
+*---------------------------------------------------------------------*
+DATA:
+  gs_alv_layout TYPE lvc_s_layo.
+
+*---------------------------------------------------------------------*
+* ALV sorting and filtering
+*---------------------------------------------------------------------*
+DATA:
+  gt_filter1 TYPE lvc_t_filt,
+  gt_filter2 TYPE lvc_t_filt,
+  gt_filter3 TYPE lvc_t_filt.
+
+*---------------------------------------------------------------------*
+* Compatibility filter
+*---------------------------------------------------------------------*
+* Keep until the existing tree and ALV filtering logic is migrated to
+* GT_FILTER1, GT_FILTER2 and GT_FILTER3.
+*---------------------------------------------------------------------*
+DATA:
+  gt_filter TYPE lvc_t_filt.
+
+*---------------------------------------------------------------------*
+* Toolbar exclusions
+*---------------------------------------------------------------------*
+DATA:
+  gt_toolbar1_ex TYPE ui_functions,
+  gt_toolbar2_ex TYPE ui_functions,
+  gt_toolbar3_ex TYPE ui_functions.
+
+*---------------------------------------------------------------------*
+* ALV event handlers
+*---------------------------------------------------------------------*
+* The corresponding classes must be declared in the CLD include and
+* implemented in the CLI include.
+*---------------------------------------------------------------------*
+DATA:
+  go_event_receiver_alv1 TYPE REF TO lcl_event_receiver_alv1,
+  go_event_receiver_alv2 TYPE REF TO lcl_event_receiver_alv2,
+  go_event_receiver_alv3 TYPE REF TO lcl_event_receiver_alv3.
+
+*---------------------------------------------------------------------*
+* Tree event handler
+*---------------------------------------------------------------------*
+DATA:
+  go_event_receiver_tree1 TYPE REF TO lcl_event_receiver_tree1.
+
+*---------------------------------------------------------------------*
+* Refresh control
+*---------------------------------------------------------------------*
+* The general flags are retained to remain compatible with the current
+* CLI implementation. The page-specific flags allow selective refresh
+* once all three ALVs are active.
+*---------------------------------------------------------------------*
+DATA:
+  gv_refresh_data TYPE abap_bool,
+  gv_refresh_grid TYPE abap_bool,
+  gv_stable_row   TYPE char1,
+  gv_stable_col   TYPE char1.
+
+DATA:
+  gv_refresh_alv1 TYPE abap_bool,
+  gv_refresh_alv2 TYPE abap_bool,
+  gv_refresh_alv3 TYPE abap_bool.
+
+*---------------------------------------------------------------------*
+* Screen and container state
+*---------------------------------------------------------------------*
+DATA:
+  gv_height TYPE i,
+  gv_width  TYPE i.
+
+DATA:
+  gv_visible_tree TYPE char1,
+  gv_visible_alv1 TYPE char1,
+  gv_visible_alv2 TYPE char1,
+  gv_visible_alv3 TYPE char1.
+
+*---------------------------------------------------------------------*
+* Compatibility visibility flag
+*---------------------------------------------------------------------*
+* The existing O01 uses GV_VISIBLE_ALV. Remove it when O01 has been
+* converted to the three page-specific visibility flags.
+*---------------------------------------------------------------------*
+DATA:
+  gv_visible_alv TYPE char1.
+
+*---------------------------------------------------------------------*
+* Selected rows - ALV1
+*---------------------------------------------------------------------*
+DATA:
+  gt_index_rows1 TYPE lvc_t_row,
+  gt_row_no1     TYPE lvc_t_roid,
+  gs_index_row1  TYPE lvc_s_row.
+
+*---------------------------------------------------------------------*
+* Selected rows - ALV2
+*---------------------------------------------------------------------*
+DATA:
+  gt_index_rows2 TYPE lvc_t_row,
+  gt_row_no2     TYPE lvc_t_roid,
+  gs_index_row2  TYPE lvc_s_row.
+
+*---------------------------------------------------------------------*
+* Selected rows - ALV3
+*---------------------------------------------------------------------*
+DATA:
+  gt_index_rows3 TYPE lvc_t_row,
+  gt_row_no3     TYPE lvc_t_roid,
+  gs_index_row3  TYPE lvc_s_row.
+
+*---------------------------------------------------------------------*
+* Compatibility selected-row data
+*---------------------------------------------------------------------*
+* The existing F01 and CLI use these names. Remove them after those
+* includes are converted to the page-specific row tables.
+*---------------------------------------------------------------------*
+DATA:
+  gt_index_rows TYPE lvc_t_row,
+  gt_row_no     TYPE lvc_t_roid,
+  gs_index_row  TYPE lvc_s_row.
+
+*---------------------------------------------------------------------*
+* Last selected ALV position
+*---------------------------------------------------------------------*
+DATA:
+  gv_row    TYPE i,
+  gv_column TYPE lvc_fname.
+
+*---------------------------------------------------------------------*
+* Dynamic selector-tree data
+*---------------------------------------------------------------------*
+DATA:
+  gr_tree_table TYPE REF TO data,
+  gr_tree_line  TYPE REF TO data.
+
+FIELD-SYMBOLS:
+  <gt_alvtree1> TYPE STANDARD TABLE,
+  <gs_alvtree1> TYPE any.
+
+*---------------------------------------------------------------------*
+* General operation result
+*---------------------------------------------------------------------*
+DATA:
+  gv_success TYPE abap_bool,
+  gv_message TYPE bapi_msg.
+
+*---------------------------------------------------------------------*
+* Complete source-layout detail buffer
+*---------------------------------------------------------------------*
+DATA:
+  gs_layout_detail TYPE zcl_alvlayoutmgr=>ty_layout_detail.
