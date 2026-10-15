@@ -1,0 +1,9 @@
+*&---------------------------------------------------------------------*
+*& Include          ZZALVLAYOUTIMPORT_TOP
+*&---------------------------------------------------------------------*
+REPORT zzalvlayoutimport_alv.
+* Top Includes
+*----------------------------------------------------------------------*
+INCLUDE zzalvlayoutimport_cld.
+INCLUDE zzalvlayoutimport_scc.
+INCLUDE zzalvlayoutimport_dat.

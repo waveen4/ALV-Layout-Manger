@@ -1,0 +1,49 @@
+*&---------------------------------------------------------------------*
+*& Report ZZALVLAYOUTIMPORT_ALV
+*&---------------------------------------------------------------------*
+*& ALV Layout Migration Utility
+*&---------------------------------------------------------------------*
+
+INCLUDE zzalvlayoutimport_top.
+INCLUDE zzalvlayoutimport_cli.
+INCLUDE zzalvlayoutimport_i01.
+INCLUDE zzalvlayoutimport_o01.
+INCLUDE zzalvlayoutimport_f01.
+
+*---------------------------------------------------------------------*
+* Initialization
+*---------------------------------------------------------------------*
+INITIALIZATION.
+
+*---------------------------------------------------------------------*
+* Selection Screen
+*---------------------------------------------------------------------*
+AT SELECTION-SCREEN.
+
+  PERFORM validate_selection_screen.
+
+*---------------------------------------------------------------------*
+* Start of Selection
+*---------------------------------------------------------------------*
+START-OF-SELECTION.
+
+  PERFORM class_objects.
+
+  PERFORM get_layout_data.
+
+  PERFORM build_fieldcat_alv1.
+  PERFORM build_fieldcat_alv2.
+  PERFORM build_fieldcat_alv3.
+
+  PERFORM alv_tree_data.
+
+*---------------------------------------------------------------------*
+* End of Selection
+*---------------------------------------------------------------------*
+END-OF-SELECTION.
+
+  IF p_ialv = abap_true.
+
+    PERFORM alv_object_screen.
+
+  ENDIF.
