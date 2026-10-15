@@ -555,7 +555,7 @@ FORM modify_toolbar_alv1
 
   PERFORM add_toolbar TABLES ct_toolbar
     USING gc_delete 'Delete' icon_delete 0
-          'Delete selected layouts from the target system'.
+          'Delete selected layouts from the source system'.
 
   PERFORM add_toolbar TABLES ct_toolbar
     USING gc_refresh 'Refresh' icon_refresh 0
@@ -875,6 +875,12 @@ FORM export_selected_layouts.
   PERFORM get_selected_alv2_rows
     CHANGING lt_selected.
 
+  IF p_test = abap_true.
+    MESSAGE 'Test mode is active; clear Test Mode before changing layouts'
+      TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
   IF lt_selected IS INITIAL.
     MESSAGE 'Select at least one target layout'
       TYPE 'S' DISPLAY LIKE 'E'.
@@ -951,6 +957,12 @@ FORM delete_selected_layouts.
   PERFORM get_selected_alv1_rows
     CHANGING lt_selected.
 
+  IF p_test = abap_true.
+    MESSAGE 'Test mode is active; clear Test Mode before changing layouts'
+      TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
+
   IF lt_selected IS INITIAL.
     MESSAGE 'Select at least one layout'
       TYPE 'S' DISPLAY LIKE 'E'.
@@ -959,9 +971,9 @@ FORM delete_selected_layouts.
 
   CALL FUNCTION 'POPUP_TO_CONFIRM'
     EXPORTING
-      titlebar              = 'Delete target ALV layouts'
+      titlebar              = 'Delete source ALV layouts'
       text_question         =
-                              'Delete the selected layouts from the target system?'
+                              'Delete the selected layouts from the source RFC system?'
       text_button_1         = 'Delete'
       text_button_2         = 'Cancel'
       default_button        = '2'
@@ -1029,6 +1041,12 @@ FORM delete_selected_target_layouts.
 *---------------------------------------------------------------------*
   PERFORM get_selected_alv2_rows
     CHANGING lt_selected.
+
+  IF p_test = abap_true.
+    MESSAGE 'Test mode is active; clear Test Mode before changing layouts'
+      TYPE 'S' DISPLAY LIKE 'E'.
+    RETURN.
+  ENDIF.
 
   IF lt_selected IS INITIAL.
 
