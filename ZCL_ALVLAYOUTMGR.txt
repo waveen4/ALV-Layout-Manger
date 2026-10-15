@@ -127,6 +127,16 @@ public section.
       !ET_LAYOUTS type TT_LAYOUT
       !EV_SUCCESS type ABAP_BOOL
       !EV_MESSAGE type BAPI_MSG .
+  methods GET_TARGET_LAYOUTS
+    importing
+      !IV_RFCDST type RFCDEST optional
+      !IR_REPORT type TY_REPORT_RANGE
+      !IR_VAR type TY_VARIANT_RANGE optional
+      !IV_USER type SYUNAME optional
+    exporting
+      !ET_LAYOUTS type TT_ALV2DATA
+      !EV_SUCCESS type ABAP_BOOL
+      !EV_MESSAGE type BAPI_MSG .
   methods READ_LAYOUT_DETAIL
     importing
       !IV_RFCDST type RFCDEST
@@ -190,16 +200,6 @@ public section.
       !IV_GLOBAL type ABAP_BOOL default ABAP_FALSE
     returning
       value(RS_KEY) type TY_LAYOUT_KEY .
-  methods GET_TARGET_LAYOUTS
-    importing
-      !IV_RFCDST type RFCDEST optional
-      !IR_REPORT type TY_REPORT_RANGE
-      !IR_VAR type TY_VARIANT_RANGE optional
-      !IV_USER type SYUNAME optional
-    exporting
-      !ET_LAYOUTS type TT_ALV2DATA
-      !EV_SUCCESS type ABAP_BOOL
-      !EV_MESSAGE type BAPI_MSG .
   methods COMPARE_LAYOUTS
     importing
       !IV_SOURCE_RFCDST type RFCDEST
@@ -1444,7 +1444,7 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
 * | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
 * | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
 * +--------------------------------------------------------------------------------------</SIGNATURE>
-METHOD get_target_layouts.
+METHOD GET_TARGET_LAYOUTS.
 
   DATA:
     lt_ltdx        TYPE STANDARD TABLE OF ltdx,
