@@ -233,6 +233,13 @@ public section.
       !IS_LAYOUT type TY_ALV2DATA
     returning
       value(RS_KEY) type TY_LAYOUT_KEY .
+  methods SET_ALV_FILTER
+    importing
+      !IS_ALV type ANY
+      !IS_FIELD type LVC_S_FCAT-FIELDNAME
+      !IT_SORT_TREE type LVC_T_SORT
+    exporting
+      !ET_FILTER type LVC_T_FILT .
   PROTECTED SECTION.
 
   PRIVATE SECTION.
@@ -280,13 +287,9 @@ ENDCLASS.
 CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->BUILD_SOURCE_KEY
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IS_LAYOUT                      TYPE        TY_LAYOUT
-* | [<-()] RS_KEY                         TYPE        TY_LAYOUT_KEY
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD build_source_key.
+
+* test
 
     CLEAR rs_key.
 
@@ -300,15 +303,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->BUILD_TARGET_KEY
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IS_LAYOUT                      TYPE        TY_LAYOUT
-* | [--->] IV_TARGETREPORT                TYPE        SYREPID(optional)
-* | [--->] IV_TARGETUSER                  TYPE        SYUNAME(optional)
-* | [--->] IV_GLOBAL                      TYPE        ABAP_BOOL (default =ABAP_FALSE)
-* | [<-()] RS_KEY                         TYPE        TY_LAYOUT_KEY
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD build_target_key.
 
     CLEAR rs_key.
@@ -343,12 +337,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->BUILD_TARGET_KEY_FROM_ALV2
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IS_LAYOUT                      TYPE        TY_ALV2DATA
-* | [<-()] RS_KEY                         TYPE        TY_LAYOUT_KEY
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD build_target_key_from_alv2.
     CLEAR rs_key.
     rs_key-report = is_layout-report.
@@ -360,17 +348,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->COMPARE_LAYOUTS
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IV_SOURCE_RFCDST               TYPE        RFCDEST
-* | [--->] IV_TARGET_RFCDST               TYPE        RFCDEST
-* | [--->] IT_SOURCE                      TYPE        TT_ALV1DATA
-* | [--->] IT_TARGET                      TYPE        TT_ALV2DATA
-* | [<---] ET_COMPARISON                  TYPE        TT_ALV3DATA
-* | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
-* | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD compare_layouts.
 
    DATA:
@@ -544,10 +521,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->CONSTRUCTOR
-* +-------------------------------------------------------------------------------------------------+
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD constructor.
 
     CLEAR: mt_layouts, mt_alv2data, mt_alv3data, ms_context.
@@ -555,12 +528,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Private Method ZCL_ALVLAYOUTMGR->CONVERT_TO_LTDXKEY
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IS_KEY                         TYPE        TY_LAYOUT_KEY
-* | [<-()] RS_VARKEY                      TYPE        LTDXKEY
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD convert_to_ltdxkey.
 
     CLEAR rs_varkey.
@@ -575,13 +542,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Private Method ZCL_ALVLAYOUTMGR->DELETE_BY_KEY
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IS_KEY                         TYPE        TY_LAYOUT_KEY
-* | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
-* | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD delete_by_key.
 
     DATA:
@@ -642,18 +602,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->DELETE_LAYOUT
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IV_RFCDST                      TYPE        RFCDEST(optional)
-* | [--->] IS_LAYOUT                      TYPE        TY_LAYOUT
-* | [--->] IV_TARGETREPORT                TYPE        SYREPID(optional)
-* | [--->] IV_TARGETUSER                  TYPE        SYUNAME(optional)
-* | [--->] IV_GLOBAL                      TYPE        ABAP_BOOL (default =ABAP_FALSE)
-* | [<---] ES_LAYOUT                      TYPE        TY_LAYOUT
-* | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
-* | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD delete_layout.
 
     DATA:
@@ -740,13 +688,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Private Method ZCL_ALVLAYOUTMGR->DETERMINE_COMPARISON
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IS_SOURCE                      TYPE        TY_ALV1DATA(optional)
-* | [--->] IS_TARGET                      TYPE        TY_ALV2DATA(optional)
-* | [<-()] RV_COMPARISON                  TYPE        CHAR20
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD determine_comparison.
     IF is_source-report IS INITIAL.
       rv_comparison = gc_status_target_only.
@@ -760,150 +701,136 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->EXPORT_LAYOUT
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IV_SOURCE_RFCDST               TYPE        RFCDEST
-* | [--->] IV_TARGET_RFCDST               TYPE        RFCDEST
-* | [--->] IS_LAYOUT                      TYPE        TY_ALV2DATA
-* | [--->] IV_TARGETREPORT                TYPE        SYREPID(optional)
-* | [--->] IV_TARGETUSER                  TYPE        SYUNAME(optional)
-* | [--->] IV_GLOBAL                      TYPE        ABAP_BOOL (default =ABAP_FALSE)
-* | [--->] IV_OVERWRITE                   TYPE        ABAP_BOOL (default =ABAP_FALSE)
-* | [<---] ES_LAYOUT                      TYPE        TY_ALV2DATA
-* | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
-* | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
-* +--------------------------------------------------------------------------------------</SIGNATURE>
-  method EXPORT_LAYOUT.
+  METHOD export_layout.
 * From target to source
 
     DATA:
-    ls_read_key        TYPE ty_layout_key,
-    ls_write_key       TYPE ty_layout_key,
-    ls_write_varkey    TYPE ltdxkey,
-    ls_detail          TYPE ty_layout_detail,
-    ls_variant         TYPE disvariant,
-    lv_read_success    TYPE abap_bool,
-    lv_message         TYPE bapi_msg,
-    lv_rfc_message     TYPE char255,
-    lv_exists          TYPE abap_bool.
+      ls_read_key     TYPE ty_layout_key,
+      ls_write_key    TYPE ty_layout_key,
+      ls_write_varkey TYPE ltdxkey,
+      ls_detail       TYPE ty_layout_detail,
+      ls_variant      TYPE disvariant,
+      lv_read_success TYPE abap_bool,
+      lv_message      TYPE bapi_msg,
+      lv_rfc_message  TYPE char255,
+      lv_exists       TYPE abap_bool.
 
-  CLEAR:
-    es_layout,
-    ev_success,
-    ev_message,
-    ls_read_key,
-    ls_write_key,
-    ls_write_varkey,
-    ls_detail,
-    ls_variant,
-    lv_read_success,
-    lv_message,
-    lv_rfc_message,
-    lv_exists.
+    CLEAR:
+      es_layout,
+      ev_success,
+      ev_message,
+      ls_read_key,
+      ls_write_key,
+      ls_write_varkey,
+      ls_detail,
+      ls_variant,
+      lv_read_success,
+      lv_message,
+      lv_rfc_message,
+      lv_exists.
 
-  es_layout = is_layout.
+    es_layout = is_layout.
 
 *---------------------------------------------------------------------*
 * Validate RFC direction
 *---------------------------------------------------------------------*
-  IF iv_target_rfcdst IS INITIAL.
+    IF iv_target_rfcdst IS INITIAL.
 
-    es_layout-status  = gc_status_error.
-    es_layout-message = 'Target RFC destination is required'.
-    ev_message        = es_layout-message.
+      es_layout-status  = gc_status_error.
+      es_layout-message = 'Target RFC destination is required'.
+      ev_message        = es_layout-message.
 
-    RETURN.
+      RETURN.
 
-  ENDIF.
+    ENDIF.
 
-  IF iv_source_rfcdst IS INITIAL.
+    IF iv_source_rfcdst IS INITIAL.
 
-    es_layout-status  = gc_status_error.
-    es_layout-message = 'Source RFC destination is required'.
-    ev_message        = es_layout-message.
+      es_layout-status  = gc_status_error.
+      es_layout-message = 'Source RFC destination is required'.
+      ev_message        = es_layout-message.
 
-    RETURN.
+      RETURN.
 
-  ENDIF.
+    ENDIF.
 
-  IF iv_target_rfcdst = iv_source_rfcdst.
+    IF iv_target_rfcdst = iv_source_rfcdst.
 
-    es_layout-status  = gc_status_error.
-    es_layout-message =
-      'Source and target RFC destinations must be different'.
-    ev_message = es_layout-message.
+      es_layout-status  = gc_status_error.
+      es_layout-message =
+        'Source and target RFC destinations must be different'.
+      ev_message = es_layout-message.
 
-    RETURN.
+      RETURN.
 
-  ENDIF.
+    ENDIF.
 
 *---------------------------------------------------------------------*
 * Build key used to read the selected ALV2 layout
 *---------------------------------------------------------------------*
-  ls_read_key =
-    me->build_target_key_from_alv2(
-      is_layout = is_layout ).
+    ls_read_key =
+      me->build_target_key_from_alv2(
+        is_layout = is_layout ).
 
 *---------------------------------------------------------------------*
 * Read complete layout definition from the target RFC
 *---------------------------------------------------------------------*
-  me->read_layout_detail(
-    EXPORTING
-      iv_rfcdst = iv_target_rfcdst
-      is_key    = ls_read_key
-    IMPORTING
-      es_detail  = ls_detail
-      ev_success = lv_read_success
-      ev_message = lv_message ).
+    me->read_layout_detail(
+      EXPORTING
+        iv_rfcdst = iv_target_rfcdst
+        is_key    = ls_read_key
+      IMPORTING
+        es_detail  = ls_detail
+        ev_success = lv_read_success
+        ev_message = lv_message ).
 
-  IF lv_read_success = abap_false.
+    IF lv_read_success = abap_false.
 
-    es_layout-status  = gc_status_error.
-    es_layout-message = lv_message.
-    ev_message        = lv_message.
+      es_layout-status  = gc_status_error.
+      es_layout-message = lv_message.
+      ev_message        = lv_message.
 
-    RETURN.
+      RETURN.
 
-  ENDIF.
+    ENDIF.
 
 *---------------------------------------------------------------------*
 * Build identity to be written to the source system
 *---------------------------------------------------------------------*
-  ls_write_key = ls_read_key.
+    ls_write_key = ls_read_key.
 
-  IF iv_targetreport IS NOT INITIAL.
-    ls_write_key-report = iv_targetreport.
-  ENDIF.
+    IF iv_targetreport IS NOT INITIAL.
+      ls_write_key-report = iv_targetreport.
+    ENDIF.
 
-  IF iv_global = abap_true.
+    IF iv_global = abap_true.
 
-    CLEAR ls_write_key-username.
+      CLEAR ls_write_key-username.
 
-  ELSEIF iv_targetuser IS NOT INITIAL.
+    ELSEIF iv_targetuser IS NOT INITIAL.
 
-    ls_write_key-username = iv_targetuser.
+      ls_write_key-username = iv_targetuser.
 
-  ENDIF.
+    ENDIF.
 
-  ls_write_varkey =
-    me->convert_to_ltdxkey(
-      is_key = ls_write_key ).
+    ls_write_varkey =
+      me->convert_to_ltdxkey(
+        is_key = ls_write_key ).
 
 *---------------------------------------------------------------------*
 * Adjust DISVARIANT identity for the destination source system
 *---------------------------------------------------------------------*
-  ls_variant = ls_detail-variant.
+    ls_variant = ls_detail-variant.
 
-  ls_variant-report     = ls_write_key-report.
-  ls_variant-variant    = ls_write_key-variant.
-  ls_variant-username   = ls_write_key-username.
-  ls_variant-handle     = ls_write_key-handle.
-  ls_variant-log_group  = ls_write_key-log_group.
+    ls_variant-report     = ls_write_key-report.
+    ls_variant-variant    = ls_write_key-variant.
+    ls_variant-username   = ls_write_key-username.
+    ls_variant-handle     = ls_write_key-handle.
+    ls_variant-log_group  = ls_write_key-log_group.
 
-  IF is_layout-text IS NOT INITIAL.
-    ls_variant-text = is_layout-text.
-  ENDIF.
+    IF is_layout-text IS NOT INITIAL.
+      ls_variant-text = is_layout-text.
+    ENDIF.
 
 *---------------------------------------------------------------------*
 * Write complete definition to the source RFC
@@ -911,135 +838,117 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
 * Replace ZZ_LAYOUT_WRITE_RFC with the name of your existing
 * remote-enabled layout-write function module if different.
 *---------------------------------------------------------------------*
-  CALL FUNCTION 'ZZ_LAYOUT_WRITE_RFC'
-    DESTINATION iv_source_rfcdst
-    EXPORTING
-      is_varkey    = ls_write_varkey
-      is_variant   = ls_variant
-      iv_overwrite  = iv_overwrite
-      iv_source_rfc = iv_target_rfcdst
-      iv_target_rfc = iv_source_rfcdst
-    IMPORTING
-      ev_success   = ev_success
-      ev_message   = ev_message
-    TABLES
-      it_dbfieldcat = ls_detail-dbfieldcat
-      it_dbsortinfo = ls_detail-dbsortinfo
-      it_dbfilter   = ls_detail-dbfilter
-      it_dblayout   = ls_detail-dblayout
-    EXCEPTIONS
-      variant_already_exists = 1
-      write_failed           = 2
-      system_failure         = 3 MESSAGE lv_rfc_message
-      communication_failure  = 4 MESSAGE lv_rfc_message
-      OTHERS                 = 5.
+    CALL FUNCTION 'ZZ_LAYOUT_WRITE_RFC'
+      DESTINATION iv_source_rfcdst
+      EXPORTING
+        is_varkey              = ls_write_varkey
+        is_variant             = ls_variant
+        iv_overwrite           = iv_overwrite
+        iv_source_rfc          = iv_target_rfcdst
+        iv_target_rfc          = iv_source_rfcdst
+      IMPORTING
+        ev_success             = ev_success
+        ev_message             = ev_message
+      TABLES
+        it_dbfieldcat          = ls_detail-dbfieldcat
+        it_dbsortinfo          = ls_detail-dbsortinfo
+        it_dbfilter            = ls_detail-dbfilter
+        it_dblayout            = ls_detail-dblayout
+      EXCEPTIONS
+        variant_already_exists = 1
+        write_failed           = 2
+        system_failure         = 3 MESSAGE lv_rfc_message
+        communication_failure  = 4 MESSAGE lv_rfc_message
+        OTHERS                 = 5.
 
 *---------------------------------------------------------------------*
 * Interpret RFC result
 *---------------------------------------------------------------------*
-  CASE sy-subrc.
+    CASE sy-subrc.
 
-    WHEN 0.
+      WHEN 0.
 
-      IF ev_success = abap_true.
+        IF ev_success = abap_true.
 
-        es_layout-status  = gc_status_exported.
-        es_layout-message = ev_message.
+          es_layout-status  = gc_status_exported.
 
-        IF es_layout-message IS INITIAL.
-          es_layout-message =
-            'Layout exported successfully'.
-          ev_message = es_layout-message.
+          IF ev_message IS INITIAL.
+            ev_message = 'Layout exported successfully'.
+          ENDIF.
+
+          es_layout-message = ev_message.
+
+        ELSE.
+
+          es_layout-status = gc_status_error.
+
+          IF ev_message IS INITIAL.
+            ev_message =
+              'Source system did not write the layout'.
+          ENDIF.
+
+          es_layout-message = ev_message.
+
         ENDIF.
 
-      ELSE.
+      WHEN 1.
 
-        es_layout-status = gc_status_error.
+        ev_success = abap_false.
+
+        ev_message =
+          'Layout already exists and overwrite is not selected'.
+
+        es_layout-status  = gc_status_skipped.
+        es_layout-message = ev_message.
+
+      WHEN 2.
+
+        ev_success = abap_false.
 
         IF ev_message IS INITIAL.
+
           ev_message =
-            'Source system did not write the layout'.
+            'Source system could not write the layout'.
+
         ENDIF.
 
+        es_layout-status  = gc_status_error.
         es_layout-message = ev_message.
 
-      ENDIF.
+      WHEN 3 OR 4.
 
-    WHEN 1.
+        ev_success = abap_false.
 
-      ev_success = abap_false.
-      ev_message = 'Export layout key is invalid'.
+        IF lv_rfc_message IS INITIAL.
 
-      es_layout-status  = gc_status_error.
-      es_layout-message = ev_message.
+          ev_message =
+            'RFC communication or source-system error'.
 
-    WHEN 2.
+        ELSE.
 
-      ev_success = abap_false.
-      ev_message =
-        'Layout already exists and overwrite is not selected'.
+          ev_message = lv_rfc_message.
 
-      es_layout-status  = gc_status_skipped.
-      es_layout-message = ev_message.
+        ENDIF.
 
-    WHEN 3.
+        es_layout-status  = gc_status_error.
+        es_layout-message = ev_message.
 
-      ev_success = abap_false.
-      ev_message =
-        'Not authorised to write the layout in the source system'.
+      WHEN OTHERS.
 
-      es_layout-status  = gc_status_error.
-      es_layout-message = ev_message.
+        ev_success = abap_false.
 
-    WHEN 4.
-
-      ev_success = abap_false.
-      ev_message =
-        'Source system could not write the layout'.
-
-      es_layout-status  = gc_status_error.
-      es_layout-message = ev_message.
-
-    WHEN 5 OR 6.
-
-      ev_success = abap_false.
-
-      IF lv_rfc_message IS INITIAL.
         ev_message =
-          'RFC communication or source-system error'.
-      ELSE.
-        ev_message = lv_rfc_message.
-      ENDIF.
+          'Unexpected error exporting the layout'.
 
-      es_layout-status  = gc_status_error.
-      es_layout-message = ev_message.
+        es_layout-status  = gc_status_error.
+        es_layout-message = ev_message.
 
-    WHEN OTHERS.
-
-      ev_success = abap_false.
-      ev_message =
-        'Unexpected error exporting the layout'.
-
-      es_layout-status  = gc_status_error.
-      es_layout-message = ev_message.
-
-  ENDCASE.
+    ENDCASE.
 
 
+  ENDMETHOD.
 
 
-
-
-  endmethod.
-
-
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->FILTER_COMPARISON
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IT_COMPARISON                  TYPE        TT_ALV3DATA
-* | [--->] IS_CONTEXT                     TYPE        TY_CONTEXT
-* | [<-()] RT_COMPARISON                  TYPE        TT_ALV3DATA
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD filter_comparison.
     DATA ls_compare TYPE ty_alv3data.
     LOOP AT it_comparison INTO ls_compare.
@@ -1055,13 +964,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->FILTER_SOURCE_LAYOUTS
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IT_SOURCE                      TYPE        TT_ALV1DATA
-* | [--->] IS_CONTEXT                     TYPE        TY_CONTEXT
-* | [<-()] RT_SOURCE                      TYPE        TT_ALV1DATA
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD filter_source_layouts.
     DATA ls_source TYPE ty_alv1data.
     LOOP AT it_source INTO ls_source.
@@ -1077,13 +979,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->FILTER_TARGET_LAYOUTS
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IT_TARGET                      TYPE        TT_ALV2DATA
-* | [--->] IS_CONTEXT                     TYPE        TY_CONTEXT
-* | [<-()] RT_TARGET                      TYPE        TT_ALV2DATA
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD filter_target_layouts.
     DATA ls_target TYPE ty_alv2data.
     LOOP AT it_target INTO ls_target.
@@ -1098,14 +993,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Private Method ZCL_ALVLAYOUTMGR->FIND_TARGET_LAYOUT
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IS_SOURCE                      TYPE        TY_ALV1DATA
-* | [--->] IT_TARGET                      TYPE        TT_ALV2DATA
-* | [<---] ES_TARGET                      TYPE        TY_ALV2DATA
-* | [<---] EV_FOUND                       TYPE        ABAP_BOOL
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD find_target_layout.
     CLEAR: es_target, ev_found.
     READ TABLE it_target INTO es_target WITH KEY
@@ -1118,17 +1005,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->GET_SOURCE_LAYOUTS
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IV_RFCDST                      TYPE        RFCDEST
-* | [--->] IR_REPORT                      TYPE        TY_REPORT_RANGE
-* | [--->] IR_VAR                         TYPE        TY_VARIANT_RANGE(optional)
-* | [--->] IV_USER                        TYPE        SYUNAME(optional)
-* | [<---] ET_LAYOUTS                     TYPE        TT_LAYOUT
-* | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
-* | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD get_source_layouts.
 
     DATA:
@@ -1359,17 +1235,6 @@ CLASS ZCL_ALVLAYOUTMGR IMPLEMENTATION.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->GET_TARGET_LAYOUTS
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IV_RFCDST                      TYPE        RFCDEST(optional)
-* | [--->] IR_REPORT                      TYPE        TY_REPORT_RANGE
-* | [--->] IR_VAR                         TYPE        TY_VARIANT_RANGE(optional)
-* | [--->] IV_USER                        TYPE        SYUNAME(optional)
-* | [<---] ET_LAYOUTS                     TYPE        TT_ALV2DATA
-* | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
-* | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
-* +--------------------------------------------------------------------------------------</SIGNATURE>
 METHOD GET_TARGET_LAYOUTS.
 
   DATA:
@@ -1550,20 +1415,6 @@ METHOD GET_TARGET_LAYOUTS.
 ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->IMPORT_LAYOUT
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IV_SOURCE_RFCDST               TYPE        RFCDEST
-* | [--->] IV_TARGET_RFCDST               TYPE        RFCDEST
-* | [--->] IS_LAYOUT                      TYPE        TY_LAYOUT
-* | [--->] IV_TARGETREPORT                TYPE        SYREPID(optional)
-* | [--->] IV_TARGETUSER                  TYPE        SYUNAME(optional)
-* | [--->] IV_GLOBAL                      TYPE        ABAP_BOOL (default =ABAP_FALSE)
-* | [--->] IV_OVERWRITE                   TYPE        ABAP_BOOL (default =ABAP_FALSE)
-* | [<---] ES_LAYOUT                      TYPE        TY_LAYOUT
-* | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
-* | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD import_layout.
 * From source -> target
 
@@ -1826,12 +1677,6 @@ IF lv_write_success = abap_true.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->LAYOUT_EXISTS
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IS_KEY                         TYPE        TY_LAYOUT_KEY
-* | [<-()] RV_EXISTS                      TYPE        ABAP_BOOL
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD layout_exists.
 
     DATA:
@@ -1861,15 +1706,6 @@ IF lv_write_success = abap_true.
   ENDMETHOD.
 
 
-* <SIGNATURE>---------------------------------------------------------------------------------------+
-* | Instance Public Method ZCL_ALVLAYOUTMGR->READ_LAYOUT_DETAIL
-* +-------------------------------------------------------------------------------------------------+
-* | [--->] IV_RFCDST                      TYPE        RFCDEST
-* | [--->] IS_KEY                         TYPE        TY_LAYOUT_KEY
-* | [<---] ES_DETAIL                      TYPE        TY_LAYOUT_DETAIL
-* | [<---] EV_SUCCESS                     TYPE        ABAP_BOOL
-* | [<---] EV_MESSAGE                     TYPE        BAPI_MSG
-* +--------------------------------------------------------------------------------------</SIGNATURE>
   METHOD read_layout_detail.
 
     DATA:
@@ -1978,5 +1814,79 @@ IF lv_write_success = abap_true.
 
     ENDCASE.
 
+  ENDMETHOD.
+
+
+  METHOD set_alv_filter.
+
+    DATA:
+      ls_filter    TYPE lvc_s_filt,
+      ls_sort_tree TYPE lvc_s_sort.
+
+    FIELD-SYMBOLS:
+      <lv_val> TYPE any.
+
+    CLEAR et_filter.
+
+*---------------------------------------------------------------------*
+* No hierarchy: filter only on the selected field
+*---------------------------------------------------------------------*
+    IF it_sort_tree IS INITIAL.
+
+      IF is_field IS INITIAL.
+        RETURN.
+      ENDIF.
+
+      ASSIGN COMPONENT is_field
+        OF STRUCTURE is_alv
+        TO <lv_val>.
+
+      IF sy-subrc <> 0.
+        RETURN.
+      ENDIF.
+
+      CLEAR ls_filter.
+
+      ls_filter-fieldname = is_field.
+      ls_filter-sign      = 'I'.
+      ls_filter-option    = 'EQ'.
+      ls_filter-low       = <lv_val>.
+
+      APPEND ls_filter TO et_filter.
+
+      RETURN.
+
+    ENDIF.
+
+*---------------------------------------------------------------------*
+* Hierarchy: cumulative filters up to the clicked field
+*---------------------------------------------------------------------*
+    LOOP AT it_sort_tree
+      INTO ls_sort_tree.
+
+      UNASSIGN <lv_val>.
+
+      ASSIGN COMPONENT ls_sort_tree-fieldname
+        OF STRUCTURE is_alv
+        TO <lv_val>.
+
+      IF sy-subrc = 0.
+
+        CLEAR ls_filter.
+
+        ls_filter-fieldname = ls_sort_tree-fieldname.
+        ls_filter-sign      = 'I'.
+        ls_filter-option    = 'EQ'.
+        ls_filter-low       = <lv_val>.
+
+        APPEND ls_filter TO et_filter.
+
+      ENDIF.
+
+      IF ls_sort_tree-fieldname = is_field.
+        EXIT.
+      ENDIF.
+
+    ENDLOOP.
   ENDMETHOD.
 ENDCLASS.

@@ -13,8 +13,34 @@ CLASS lcl_event_receiver_tree1 IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD item_double_click.
-    PERFORM set_tree_context USING index_outtab grouplevel.
-    PERFORM apply_tree_filter.
+
+    DATA:
+      lt_filter TYPE lvc_t_filt.
+
+    READ TABLE <gt_alvtree1>
+      INTO <gs_alvtree1>
+      INDEX index_outtab.
+
+    CHECK sy-subrc = 0.
+
+*---------------------------------------------------------------------*
+* ALV1
+*---------------------------------------------------------------------*
+    go_layout_mgr->set_alv_filter(
+      EXPORTING
+        is_alv       = <gs_alvtree1>
+        is_field     = grouplevel
+        it_sort_tree = gt_sort_tree
+      IMPORTING
+        et_filter    = lt_filter ).
+
+    gt_filter1 = lt_filter.
+
+    PERFORM set_grid_filter
+      USING
+        alv_grid1
+        gt_filter1.
+
   ENDMETHOD.
 
 ENDCLASS.
