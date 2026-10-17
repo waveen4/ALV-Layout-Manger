@@ -8,22 +8,38 @@
 CLASS lcl_event_receiver_tree1 IMPLEMENTATION.
 
   METHOD node_double_click.
-
-*   Reserved for future use.
-
+    PERFORM set_tree_context USING index_outtab grouplevel.
+    PERFORM apply_tree_filter.
   ENDMETHOD.
 
   METHOD item_double_click.
 
-*   Tree controls filtering only.
-*   The selected tree node will later populate GS_CONTEXT and all three
-*   ALVs will be refreshed using the same filter context.
+    DATA:
+      lt_filter TYPE lvc_t_filt.
 
-    gv_refresh_alv1 = abap_true.
-    gv_refresh_alv2 = abap_true.
-    gv_refresh_alv3 = abap_true.
+    READ TABLE <gt_alvtree1>
+      INTO <gs_alvtree1>
+      INDEX index_outtab.
 
-    gv_refresh_grid = abap_true.
+    CHECK sy-subrc = 0.
+
+*---------------------------------------------------------------------*
+* ALV1
+*---------------------------------------------------------------------*
+    go_layout_mgr->set_alv_filter(
+      EXPORTING
+        is_alv       = <gs_alvtree1>
+        is_field     = grouplevel
+        it_sort_tree = gt_sort_tree
+      IMPORTING
+        et_filter    = lt_filter ).
+
+    gt_filter1 = lt_filter.
+
+    PERFORM set_grid_filter
+      USING
+        alv_grid1
+        gt_filter1.
 
   ENDMETHOD.
 
@@ -176,6 +192,13 @@ CLASS lcl_event_receiver_alv2 IMPLEMENTATION.
     PERFORM user_command
       USING e_ucomm.
 
+    IF gv_refresh_grid = abap_true.
+      PERFORM refresh_alv_report
+        USING gv_stable_row
+              gv_stable_col.
+      gv_refresh_grid = abap_false.
+    ENDIF.
+
   ENDMETHOD.
 
 
@@ -236,6 +259,14 @@ CLASS lcl_event_receiver_alv3 IMPLEMENTATION.
 
     PERFORM user_command
       USING e_ucomm.
+
+    IF gv_refresh_grid = abap_true.
+      PERFORM refresh_alv_report
+        USING gv_stable_row
+              gv_stable_col.
+      gv_refresh_grid = abap_false.
+    ENDIF.
+
 
   ENDMETHOD.
 

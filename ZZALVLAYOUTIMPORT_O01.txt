@@ -86,10 +86,10 @@ FORM create_left_container.
 
   CREATE OBJECT left_container1
     EXPORTING
-      repid     = gv_repid
-      dynnr     = lv_dynnr
-      side      = cl_gui_docking_container=>dock_at_left
-      extension = lv_extension
+      repid                       = gv_repid
+      dynnr                       = lv_dynnr
+      side                        = cl_gui_docking_container=>dock_at_left
+      extension                   = lv_extension
     EXCEPTIONS
       cntl_error                  = 1
       cntl_system_error           = 2
@@ -145,12 +145,12 @@ FORM create_selector_tree.
 
   CREATE OBJECT alv_tree1
     EXPORTING
-      i_parent                 = left_container1
-      i_node_selection_mode    =
-        cl_gui_column_tree=>node_sel_mode_single
-      i_item_selection         = abap_true
-      i_no_html_header         = abap_true
-      i_no_toolbar             = abap_false
+      i_parent                    = left_container1
+      i_node_selection_mode       =
+                                    cl_gui_column_tree=>node_sel_mode_single
+      i_item_selection            = abap_true
+      i_no_html_header            = abap_true
+      i_no_toolbar                = abap_false
     EXCEPTIONS
       cntl_error                  = 1
       cntl_system_error           = 2
@@ -186,15 +186,18 @@ FORM create_selector_tree.
   " Optimise the selector tree column widths
   CALL METHOD alv_tree1->column_optimize.
 
-  " Expand the report hierarchy
-  CALL METHOD alv_tree1->expand_tree
-    EXPORTING
-      i_level = 1
-    EXCEPTIONS
-      failed  = 1
-      OTHERS  = 2.
+*  " Expand the report hierarchy
+*  CALL METHOD alv_tree1->expand_tree
+*    EXPORTING
+*      i_level = 1
+*    EXCEPTIONS
+*      failed  = 1
+*      OTHERS  = 2.
 
   CALL METHOD alv_tree1->frontend_update.
+  CALL METHOD alv_tree1->expand_tree
+    EXPORTING
+      i_level = 1.
 
 ENDFORM.
 
@@ -312,14 +315,14 @@ FORM build_alv1.
 
   CALL METHOD alv_grid1->set_table_for_first_display
     EXPORTING
-      is_variant           = ls_variant
-      i_save               = 'A'
-      i_default            = abap_true
-      is_layout            = gs_alv_layout1
-      it_toolbar_excluding = gt_toolbar1_ex
+      is_variant                    = ls_variant
+      i_save                        = 'A'
+      i_default                     = abap_true
+      is_layout                     = gs_alv_layout1
+      it_toolbar_excluding          = gt_toolbar1_ex
     CHANGING
-      it_fieldcatalog      = gt_fieldcat1
-      it_outtab            = gt_alv1
+      it_fieldcatalog               = gt_fieldcat1
+      it_outtab                     = gt_alv1
     EXCEPTIONS
       invalid_parameter_combination = 1
       program_error                 = 2
@@ -404,10 +407,10 @@ FORM create_page_container
 
   CREATE OBJECT co_container
     EXPORTING
-      repid     = gv_repid
-      dynnr     = sy-dynnr
-      side      = cl_gui_docking_container=>dock_at_top
-      extension = 1000
+      repid                       = gv_repid
+      dynnr                       = sy-dynnr
+      side                        = cl_gui_docking_container=>dock_at_top
+      extension                   = 1000
     EXCEPTIONS
       cntl_error                  = 1
       cntl_system_error           = 2
@@ -457,7 +460,7 @@ FORM create_alv_grid
 
   CREATE OBJECT co_grid
     EXPORTING
-      i_parent = io_parent
+      i_parent          = io_parent
     EXCEPTIONS
       error_cntl_create = 1
       error_cntl_init   = 2
